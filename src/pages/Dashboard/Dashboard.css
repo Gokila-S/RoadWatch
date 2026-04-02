@@ -1,0 +1,60 @@
+.citizen-dashboard {
+  padding-top: 100px;
+  padding-bottom: 60px;
+  min-height: 100vh;
+}
+
+.dashboard-header {
+  border-bottom: 1px solid var(--border-subtle);
+  padding-bottom: var(--space-lg);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  gap: var(--space-xl);
+  align-items: start;
+}
+
+.report-card {
+  transition: all var(--transition-fast);
+}
+
+.report-card:hover {
+  transform: translateX(4px);
+  border-color: var(--border-medium);
+}
+
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;  
+  overflow: hidden;
+}
+
+.sticky-sidebar {
+  position: sticky;
+  top: 100px;
+}
+
+.font-semibold { font-weight: 600; }
+.space-y-sm > * + * { margin-top: var(--space-sm); }
+.space-y-md > * + * { margin-top: var(--space-md); }
+.space-y-lg > * + * { margin-top: var(--space-lg); }
+.py-1 { padding-top: 4px; padding-bottom: 4px; }
+.opacity-80 { opacity: 0.8; }
+.border-b { border-bottom-width: 1px; border-bottom-style: solid; }
+.self-center { align-self: center; }
+
+/* Simple shimmer for mock images */
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--bg-tertiary) 25%, var(--bg-surface) 50%, var(--bg-tertiary) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.8s ease-in-out infinite;
+}
+
+@media (max-width: 1024px) {
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}

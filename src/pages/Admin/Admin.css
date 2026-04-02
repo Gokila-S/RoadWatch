@@ -1,0 +1,111 @@
+.admin-command-center {
+  height: 100vh;
+  padding-top: 70px; /* Header height */
+  overflow: hidden;
+}
+
+.command-header {
+  height: 60px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.filter-select {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  outline: none;
+}
+
+.filter-select:focus {
+  border-color: var(--amber);
+}
+
+.command-workspace {
+  position: relative;
+}
+
+.workspace-map {
+  background: var(--bg-primary);
+}
+
+.workspace-map .map-container {
+  border-radius: 0;
+  border: none;
+}
+
+.radar-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at center, transparent 30%, rgba(10,10,12,0.4) 70%, rgba(10,10,12,0.8) 100%);
+  pointer-events: none;
+  z-index: 400;
+}
+
+/* Optional radar sweet aesthetic */
+.radar-overlay::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  height: 200%;
+  background: conic-gradient(from 0deg, transparent 70%, rgba(245, 158, 11, 0.05) 100%);
+  transform-origin: center;
+  animation: radar-spin 10s linear infinite;
+  margin-left: -100%;
+  margin-top: -100%;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+@keyframes radar-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.workspace-panel {
+  width: 400px;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 500;
+  box-shadow: -10px 0 30px rgba(0,0,0,0.5);
+}
+
+.workspace-panel.panel-open {
+  transform: translateX(0);
+}
+
+/* Utilities used in Admin */
+.ml-xs { margin-left: var(--space-xs); }
+.pl-md { padding-left: var(--space-md); }
+.p-md { padding: var(--space-md); }
+.p-sm { padding: var(--space-sm); }
+.p-xl { padding: var(--space-xl); }
+.bg-secondary { background: var(--bg-secondary); }
+.bg-tertiary { background: var(--bg-tertiary); }
+.border-l { border-left: 1px solid; }
+.border-b { border-bottom: 1px solid; }
+.border-t { border-top: 1px solid; }
+.tracking-wide { letter-spacing: 0.05em; }
+.leading-relaxed { line-height: 1.6; }
+.font-medium { font-weight: 500; }
+.opacity-10 { opacity: 0.1; }
+
+@media (min-width: 1024px) {
+  .workspace-panel {
+    position: relative;
+    transform: translateX(0); /* Always visible space on desktop, just empty if no selection */
+    box-shadow: none;
+  }
+}
