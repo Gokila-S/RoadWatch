@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ClipboardList, Bot, CheckCircle, AlertTriangle, MapPin } from 'lucide-react'
 import useStore from '../../store/useStore'
+import logoImg from '../../assets/logo.png'
 import './Header.css'
 
 const Header = () => {
@@ -53,12 +54,8 @@ const Header = () => {
     <header className={`header ${scrolled ? 'header-scrolled' : ''}`}>
       <div className="header-inner">
         <Link to="/" className="header-logo">
-          <div className="logo-icon">
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-              <path d="M14 2L2 8v12l12 6 12-6V8L14 2z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-              <path d="M14 2v24M2 8l12 6 12-6" stroke="currentColor" strokeWidth="1.5"/>
-              <circle cx="14" cy="14" r="3" fill="var(--amber)"/>
-            </svg>
+          <div className="logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img src={logoImg} alt="RoadWatch Logo" style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
           </div>
           <div className="logo-text">
             <span className="logo-name">ROADWATCH</span>
@@ -183,15 +180,35 @@ const Header = () => {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -10, scale: 0.95 }}
                       transition={{ duration: 0.2 }}
+                      style={{ 
+                        width: ['admin', 'superadmin'].includes(userRole) ? '320px' : '220px', 
+                        padding: ['admin', 'superadmin'].includes(userRole) ? '16px' : '12px' 
+                      }}
                     >
-                      <div className="profile-info">
-                        <div className="profile-avatar profile-avatar-lg">{user?.name?.charAt(0)}</div>
-                        <div>
-                          <p className="profile-dropdown-name">{user?.name}</p>
-                          <p className="text-mono text-dim">{user?.role?.toUpperCase()}</p>
+                      {['admin', 'superadmin'].includes(userRole) ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0, paddingBottom: '12px' }}>
+                          <div className="admin-avatar-hex-sm" style={{ width: '42px', height: '42px', borderRadius: '8px', background: 'var(--bg-primary)' }}>
+                            <span className="hex-inner-sm" style={{ fontSize: '1.2rem', color: 'var(--signal-cyan)' }}>{user?.name?.charAt(0) || 'A'}</span>
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: 'var(--signal-cyan)', letterSpacing: '0.1em', marginBottom: '2px' }}>
+                              COMMANDER // {user?.district?.toUpperCase() || 'GLOBAL'}
+                            </div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#fff' }}>{user?.name}</div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="profile-divider"></div>
+                      ) : (
+                        <div className="profile-info">
+                          <div className="profile-avatar profile-avatar-lg">{user?.name?.charAt(0)}</div>
+                          <div>
+                            <p className="profile-dropdown-name">{user?.name}</p>
+                            <p className="text-mono text-dim">{user?.role?.toUpperCase()}</p>
+                          </div>
+                        </div>
+                      )}
+                      
+                      <div className="profile-divider" style={{ margin: '8px 0' }}></div>
+                      
                       <button className="profile-option" onClick={handleLogout}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>

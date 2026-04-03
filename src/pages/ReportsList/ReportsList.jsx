@@ -23,6 +23,8 @@ const ReportsList = () => {
   const [sortBy, setSortBy] = useState('date_desc')
   const [selectedIds, setSelectedIds] = useState([])
   const [bulkAction, setBulkAction] = useState('')
+  const [slaFilter, setSlaFilter] = useState('all')
+  const [confidenceFilter, setConfidenceFilter] = useState('all')
   
   // Side Panel State
   const [selectedReport, setSelectedReport] = useState(null)
@@ -46,6 +48,29 @@ const ReportsList = () => {
     if (statusFilter !== 'all') result = result.filter(r => r.status === statusFilter)
     if (severityFilter !== 'all') result = result.filter(r => r.severity === severityFilter)
     
+    // SLA Filtering
+    if (slaFilter !== 'all') {
+      const now = new Date('2026-04-03T09:00:00Z')
+      result = result.filter(r => {
+        if (r.status === 'resolved') return slaFilter === 'safe' // assume resolved is safe or skip
+        const diffH = (new Date(r.slaDeadline) - now) / 3600000;
+        if (slaFilter === 'breached') return diffH < 0;
+        if (slaFilter === 'warning') return diffH >= 0 && diffH < 12;
+        if (slaFilter === 'safe') return diffH >= 12;
+        return true;
+      })
+    }
+
+    // AI Confidence Filtering
+    if (confidenceFilter !== 'all') {
+      result = result.filter(r => {
+        if (confidenceFilter === 'high') return r.aiConfidence >= 90;
+        if (confidenceFilter === 'medium') return r.aiConfidence >= 70 && r.aiConfidence < 90;
+        if (confidenceFilter === 'low') return r.aiConfidence < 70;
+        return true;
+      })
+    }
+
     // Date Filtering
     if (dateRange !== 'all') {
       const now = new Date('2026-04-03T09:00:00Z')
@@ -74,7 +99,7 @@ const ReportsList = () => {
     })
 
     return result
-  }, [adminReports, dateRange, statusFilter, severityFilter, searchQuery, sortBy])
+  }, [adminReports, dateRange, statusFilter, severityFilter, searchQuery, sortBy, slaFilter, confidenceFilter])
 
   // Handlers
   const toggleSelectAll = () => {
@@ -111,183 +136,221 @@ const ReportsList = () => {
   }
 
   return (
-    <div className="reports-container">
-      <div className="reports-header-inner">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <h1 className="reports-title">
-              <FileBox size={24} color="var(--signal-blue)" /> Universal Reports Registry
-            </h1>
-            <p className="reports-subtitle">Manage, filter, and execute operations on jurisdiction reports.</p>
+    <div className="reports-container sidebar-layout">
+      {/* LEFT SIDEBAR: Advanced Filters & KPIs */}
+      <div className="reports-sidebar">
+        
+        {/* KPI Section */}
+        <div className="sidebar-kpi-section">
+          <div className="kpi-item-side">
+            <span className="kpi-label-side">PENDING</span>
+            <span className="kpi-value-side" style={{ color: 'var(--amber)' }}>{adminReports.filter(r => r.status === 'pending').length}</span>
           </div>
-          <button className="btn border border-dim hover:bg-surface text-sm flex justify-center items-center gap-2" style={{ height: 'fit-content', padding: '10px 16px' }}>
-            <Download size={16} /> Export CSV
-          </button>
+          <div className="kpi-item-side">
+            <span className="kpi-label-side">ASSIGNED</span>
+            <span className="kpi-value-side" style={{ color: 'var(--signal-blue)' }}>{adminReports.filter(r => r.status === 'assigned').length}</span>
+          </div>
+          <div className="kpi-item-side kpi-critical-side">
+            <span className="kpi-label-side" style={{ color: '#FF3B30' }}>CRITICAL</span>
+            <span className="kpi-value-side pulse-critical-text" style={{ color: '#FF3B30' }}>
+              {adminReports.filter(r => r.severity === 'critical' && r.status !== 'resolved').length}
+            </span>
+          </div>
         </div>
 
-        {/* Sleek Toolbar */}
-        <div className="reports-toolbar">
-          <div className="toolbar-input-group">
-            <Search size={16} />
-            <input 
-              type="text" 
-              placeholder="Search explicitly by ID or location..."
-              className="toolbar-input"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          <div style={{ position: 'relative' }}>
-             <select 
-               className="toolbar-select"
-               value={dateRange}
-               onChange={(e) => setDateRange(e.target.value)}
-             >
-               <option value="all">Timeframe: All Time</option>
-               <option value="today">Timeframe: Today</option>
-               <option value="week">Timeframe: This Week</option>
-               <option value="month">Timeframe: This Month</option>
-             </select>
+        <div className="sidebar-divider"></div>
+
+        {/* Scrollable Filters Section */}
+        <div className="sidebar-filters">
+          <div className="filter-group">
+            <div className="toolbar-input-group">
+              <Search size={16} />
+              <input 
+                type="text" 
+                placeholder="Search ID or Location..."
+                className="toolbar-input-side"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
 
-          <select 
-            className="toolbar-select"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="all">Status: All</option>
-            <option value="pending">Status: Pending</option>
-            <option value="verified">Status: Verified</option>
-            <option value="assigned">Status: Assigned</option>
-            <option value="resolved">Status: Resolved</option>
-          </select>
+          <div className="filter-group">
+            <h4 className="filter-heading">Status</h4>
+            <div className="chip-container-side">
+              {['all', 'pending', 'verified', 'assigned', 'resolved'].map(status => (
+                <button 
+                  key={status}
+                  className={`filter-chip-side ${statusFilter === status ? 'active' : ''}`}
+                  onClick={() => setStatusFilter(status)}
+                >
+                  {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <select 
-            className="toolbar-select"
-            value={severityFilter}
-            onChange={(e) => setSeverityFilter(e.target.value)}
-          >
-            <option value="all">Severity: All</option>
-            <option value="critical">Severity: Critical</option>
-            <option value="high">Severity: High</option>
-            <option value="medium">Severity: Medium</option>
-            <option value="low">Severity: Low</option>
-          </select>
-          
-          <select 
-            className="toolbar-select"
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            style={{ borderLeft: '4px solid var(--amber)', paddingLeft: '12px' }}
-          >
-            <option value="date_desc">Sort: Newest First</option>
-            <option value="date_asc">Sort: Oldest First</option>
-            <option value="priority_desc">Sort: Highest Priority</option>
-          </select>
+          <div className="filter-group">
+            <h4 className="filter-heading">Severity Feature</h4>
+            <div className="chip-container-side">
+              {['all', 'critical', 'high', 'medium', 'low'].map(sev => (
+                <button 
+                  key={sev}
+                  className={`filter-chip-side sev-${sev} ${severityFilter === sev ? 'active' : ''}`}
+                  onClick={() => setSeverityFilter(sev)}
+                >
+                  {sev === 'all' ? 'All' : sev.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="filter-group">
+            <h4 className="filter-heading">SLA Status</h4>
+            <div className="chip-container-side">
+               {[
+                 { id: 'all', label: 'All' },
+                 { id: 'safe', label: 'Safe (>12h)' },
+                 { id: 'warning', label: 'Warning (<12h)' },
+                 { id: 'breached', label: 'Breached' }
+               ].map(f => (
+                 <button 
+                   key={f.id}
+                   className={`filter-chip-side ${slaFilter === f.id ? 'active' : ''}`}
+                   onClick={() => setSlaFilter(f.id)}
+                 >
+                   {f.label}
+                 </button>
+               ))}
+            </div>
+          </div>
+
+          <div className="filter-group">
+            <h4 className="filter-heading">AI Confidence</h4>
+            <div className="chip-container-side">
+               {[
+                 { id: 'all', label: 'All' },
+                 { id: 'high', label: '> 90%' },
+                 { id: 'medium', label: '70-90%' },
+                 { id: 'low', label: '< 70%' }
+               ].map(f => (
+                 <button 
+                   key={f.id}
+                   className={`filter-chip-side ${confidenceFilter === f.id ? 'active' : ''}`}
+                   onClick={() => setConfidenceFilter(f.id)}
+                 >
+                   {f.label}
+                 </button>
+               ))}
+            </div>
+          </div>
+
+          <div className="filter-group">
+            <h4 className="filter-heading">Timeframe</h4>
+            <div className="chip-container-side">
+               {[
+                 { id: 'all', label: 'All Time' },
+                 { id: 'today', label: 'Today' },
+                 { id: 'week', label: '7 Days' },
+                 { id: 'month', label: '30 Days' }
+               ].map(t => (
+                 <button 
+                   key={t.id}
+                   className={`filter-chip-side ${dateRange === t.id ? 'active' : ''}`}
+                   onClick={() => setDateRange(t.id)}
+                 >
+                   {t.label}
+                 </button>
+               ))}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="reports-body">
-        {/* Bulk Actions Banner */}
-        <AnimatePresence>
-          {selectedIds.length > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: -20, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: 'auto' }}
-              exit={{ opacity: 0, y: -20, height: 0 }}
-              style={{ overflow: 'hidden' }}
-            >
-              <div style={{ background: 'rgba(13, 203, 242, 0.1)', border: '1px solid rgba(13, 203, 242, 0.3)', borderRadius: '8px', padding: '12px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <CheckSquare size={18} color="var(--signal-cyan)" />
-                  <span style={{ fontSize: '0.875rem', fontWeight: '600', color: '#fff' }}>{selectedIds.length} Reports Selected</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                   <select 
-                     style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid var(--border-dim)', borderRadius: '6px', padding: '8px 12px', color: '#fff', fontSize: '0.875rem', outline: 'none', colorScheme: 'dark' }}
-                     value={bulkAction}
-                     onChange={(e) => setBulkAction(e.target.value)}
-                   >
-                     <option value="">Select Bulk Action...</option>
-                     <option value="verified">Mark as Verified</option>
-                     <option value="assigned">Assign to General Dept</option>
-                     <option value="resolved">Mark as Resolved</option>
-                   </select>
-                   <button 
-                     onClick={handleBulkExecute}
-                     disabled={!bulkAction}
-                     className="btn bg-signal-blue text-black hover:brightness-110 font-bold px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                     style={{ fontSize: '0.875rem' }}
-                   >
-                     EXECUTE
-                   </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* MAIN BODY: Grid Layout */}
+      <div className="reports-main-area">
+        {filteredAndSortedReports.length === 0 ? (
+           <div className="empty-state-ui">
+             <div className="empty-icon-wrap">
+               <CheckCircle2 size={48} color="#34C759" />
+             </div>
+             <h3>City is running smoothly</h3>
+             <p>No active tasks match your current filter parameters or jurisdiction.</p>
+           </div>
+        ) : (
+           <div className="report-card-grid">
+             {filteredAndSortedReports.map(report => {
+                const isCritical = report.severity === 'critical';
+                
+                // Rough SLA calc
+                const sladeadline = new Date(report.slaDeadline);
+                const now = new Date('2026-04-03T09:00:00Z');
+                const diffH = (sladeadline - now) / 3600000;
+                let slaText = diffH < 0 ? 'BREACHED' : `${Math.floor(diffH)}h left`;
+                let slaClass = diffH < 0 ? 'sla-critical' : diffH < 12 ? 'sla-warn' : 'sla-safe';
+                if (report.status === 'resolved') {
+                  slaText = 'RESOLVED';
+                  slaClass = 'sla-resolved';
+                }
 
-        {/* Data Table */}
-        <div className="reports-table-wrapper">
-          <table className="reports-table">
-            <thead>
-              <tr>
-                <th style={{ width: '50px', textAlign: 'center' }}>
-                  <input type="checkbox" style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                    checked={filteredAndSortedReports.length > 0 && selectedIds.length === filteredAndSortedReports.length}
-                    onChange={toggleSelectAll} 
-                  />
-                </th>
-                <th>TICKET ID</th>
-                <th>ISSUE & LOCATION</th>
-                <th>STATUS</th>
-                <th>SEVERITY</th>
-                <th>FILED ON</th>
-                <th style={{ width: '40px' }}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAndSortedReports.length === 0 ? (
-                <tr>
-                  <td colSpan="7" style={{ padding: '60px', textAlign: 'center', color: 'var(--text-dim)' }}>
-                    No reports match your selected criteria.
-                  </td>
-                </tr>
-              ) : (
-                filteredAndSortedReports.map(report => (
-                  <tr key={report.id} onClick={() => { setSelectedReport(report); setAssigningMode(false); }}>
-                    <td style={{ textAlign: 'center' }} onClick={e => e.stopPropagation()}>
-                      <input 
-                        type="checkbox" 
-                        style={{ width: '16px', height: '16px', cursor: 'pointer' }}
-                        checked={selectedIds.includes(report.id)}
-                        onChange={(e) => toggleSelect(e, report.id)}
-                      />
-                    </td>
-                    <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--signal-cyan)' }}>
-                      {report.id}
-                    </td>
-                    <td>
-                      <p style={{ fontWeight: '600', fontSize: '0.875rem', color: 'var(--text-primary)', margin: '0 0 4px 0' }} className="line-clamp-1">
-                        {report.title}
-                      </p>
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, display: 'flex', alignItems: 'center', gap: '4px' }} className="line-clamp-1">
-                        <MapPin size={12} style={{ flexShrink: 0 }} /> {report.location.address} <span style={{ color: 'var(--text-dim)', margin: '0 4px' }}>|</span> {report.district}
-                      </p>
-                    </td>
-                    <td><StatusBadge status={report.status} /></td>
-                    <td><SeverityBadge severity={report.severity} /></td>
-                    <td style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                      {new Date(report.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </td>
-                    <td style={{ color: 'var(--border-subtle)' }}><ChevronRight size={18} /></td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                return (
+                  <div key={report.id} className="mission-card group" onClick={() => setSelectedReport(report)}>
+                     <div className="card-header">
+                       <span className="card-id">{report.id}</span>
+                       <span className={`severity-badge-custom sev-${report.severity} ${isCritical && report.status !== 'resolved' ? 'pulse-critical' : ''}`}>
+                         {report.severity.toUpperCase()}
+                       </span>
+                     </div>
+
+                     <div className="card-image-box">
+                       {report.images?.[0] && !report.images[0].includes('placeholder') ? (
+                         <img src={report.images[0]} alt="report image" />
+                       ) : (
+                         <div className="no-image">NO VISUAL</div>
+                       )}
+                       <div className="status-overlay">
+                         <StatusBadge status={report.status} />
+                       </div>
+                     </div>
+
+                     <div className="card-content">
+                       <h3 className="card-title line-clamp-1">{report.title}</h3>
+                       <div className="card-location line-clamp-1">
+                         <MapPin size={12} style={{ flexShrink: 0, marginTop: '1px' }} /> 
+                         <span>{report.location.address}</span>
+                       </div>
+                       
+                       <div className="card-footer">
+                         <div className="report-date">
+                           <Calendar size={12}/> {new Date(report.createdAt).toLocaleDateString()}
+                         </div>
+                         <div className={`sla-timer ${slaClass}`}>
+                           {slaText}
+                         </div>
+                       </div>
+                     </div>
+
+                     {/* HOVER ACTIONS */}
+                     <div className="card-hover-actions">
+                       <button className="action-btn primary" onClick={(e) => { e.stopPropagation(); setSelectedReport(report); }}>
+                         Review Detail
+                       </button>
+                       {report.status === 'pending' && (
+                         <button className="action-btn secondary" onClick={(e) => { e.stopPropagation(); updateReportStatus(report.id, 'verified'); }}>
+                           Verify
+                         </button>
+                       )}
+                       {report.status === 'verified' && (
+                         <button className="action-btn secondary" onClick={(e) => { e.stopPropagation(); updateReportStatus(report.id, 'assigned'); }}>
+                           Assign
+                         </button>
+                       )}
+                     </div>
+                  </div>
+                )
+             })}
+           </div>
+        )}
       </div>
       
       {/* Slide-in Detail Panel */}
@@ -329,7 +392,7 @@ const ReportsList = () => {
                    ) : (
                      <img src={selectedReport.images[0]} alt="evidence" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }} />
                    )}
-                   <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px' }}>
+                   <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px', background: 'rgba(0,0,0,0.8)', padding: '4px', borderRadius: '6px' }}>
                      <StatusBadge status={selectedReport.status} />
                    </div>
                    <div style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', padding: '12px', borderRadius: '6px', fontSize: '0.85rem', color: '#fff', border: '1px solid var(--border-dim)' }}>
@@ -347,7 +410,9 @@ const ReportsList = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                    <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-dim)' }}>
                      <p style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', margin: '0 0 8px 0' }}>CURRENT SEVERITY</p>
-                     <SeverityBadge severity={selectedReport.severity} />
+                     <span className={`severity-badge-custom sev-${selectedReport.severity} w-full text-center block`}>
+                       {selectedReport.severity.toUpperCase()}
+                     </span>
                    </div>
                    <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-dim)' }}>
                      <p style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', margin: '0 0 8px 0' }}>AI CONFIDENCE</p>

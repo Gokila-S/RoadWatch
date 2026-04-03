@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import MapView from '../../components/MapView/MapView'
 import useStore from '../../store/useStore'
+import logoImg from '../../assets/logo.png'
 import './Landing.css'
 
 const Landing = () => {
@@ -346,12 +347,9 @@ const Landing = () => {
         <div className="container">
           <div className="footer-content">
             <div className="footer-brand">
-              <div className="header-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div className="logo-icon" style={{ color: 'var(--amber)' }}>
-                  <svg width="24" height="24" viewBox="0 0 28 28" fill="none">
-                    <path d="M14 2L2 8v12l12 6 12-6V8L14 2z" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-                    <circle cx="14" cy="14" r="3" fill="var(--amber)"/>
-                  </svg>
+              <div className="header-logo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img src={logoImg} alt="RoadWatch Logo" style={{ width: '24px', height: '24px', objectFit: 'contain' }} />
                 </div>
                 <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: '0.9rem', letterSpacing: '0.1em' }}>ROADWATCH</span>
               </div>

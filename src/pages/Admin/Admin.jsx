@@ -103,22 +103,6 @@ const Admin = () => {
 
         {/* 📋 RIGHT PANEL (30%) */}
         <div className="workspace-panel">
-          {/* Admin Mini-Profile Banner */}
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border-dim)', display: 'flex', alignItems: 'center', gap: '16px', background: 'var(--bg-secondary)', flexShrink: 0, boxShadow: '0 4px 20px rgba(0,0,0,0.2)', zIndex: 10 }}>
-            <div className="admin-avatar-hex-sm" style={{ width: '36px', height: '36px', borderRadius: '8px' }}>
-              <span className="hex-inner-sm" style={{ fontSize: '1rem' }}>{user?.name?.charAt(0) || 'A'}</span>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: 'var(--signal-cyan)', letterSpacing: '0.1em', marginBottom: '2px' }}>
-                COMMANDER // {user?.district?.toUpperCase() || 'GLOBAL'}
-              </div>
-              <div style={{ fontSize: '1rem', fontWeight: 'bold', color: '#fff' }}>{user?.name}</div>
-            </div>
-            <button style={{ marginLeft: 'auto', background: 'rgba(13,203,242,0.1)', border: '1px solid rgba(13,203,242,0.3)', color: 'var(--signal-cyan)', padding: '6px 12px', borderRadius: '4px', fontSize: '0.7rem', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
-              ANALYTICS ↗
-            </button>
-          </div>
-
           {!selectedReport ? (
             // LIST VIEW (Default Control Panel)
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
@@ -127,7 +111,7 @@ const Admin = () => {
                <div className="filter-row">
                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                    <h2 style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', margin: 0 }}>
-                     <Clock size={16} color="var(--amber)" /> Dispatch Queue
+                     <Clock size={16} color="var(--amber)" /> Live Incident Feed
                    </h2>
                  </div>
                  
