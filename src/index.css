@@ -50,8 +50,8 @@
   --shadow-glow-strong: 0 0 40px rgba(245, 158, 11, 0.25);
 
   /* ── Typography ── */
-  --font-display: 'Orbitron', sans-serif;
-  --font-body: 'Space Grotesk', sans-serif;
+  --font-display: 'Plus Jakarta Sans', sans-serif;
+  --font-body: 'Inter', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   /* ── Spacing ── */
@@ -81,9 +81,9 @@
   --z-base: 0;
   --z-overlay: 100;
   --z-panel: 200;
-  --z-header: 300;
-  --z-modal: 400;
-  --z-toast: 500;
+  --z-header: 2000;
+  --z-modal: 2100;
+  --z-toast: 2200;
 }
 
 /* ============================================
@@ -507,13 +507,22 @@ img { max-width: 100%; display: block; }
 .container {
   width: 100%;
   max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 var(--space-lg);
+  margin-left: auto;
+  margin-right: auto;
+  padding-inline: var(--space-xl);
 }
 
 .container-wide {
   max-width: 1600px;
 }
+
+/* Base utilities used across the app */
+.relative { position: relative; }
+.absolute { position: absolute; }
+.fixed { position: fixed; }
+.overflow-hidden { overflow: hidden; }
+.z-10 { z-index: 10; }
+.z-50 { z-index: 50; }
 
 .flex { display: flex; }
 .flex-col { flex-direction: column; }

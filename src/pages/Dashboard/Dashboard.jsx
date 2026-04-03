@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
+import { MapPin } from 'lucide-react'
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
 import { StatusBadge, SeverityBadge } from '../../components/StatusBadge/StatusBadge'
@@ -39,36 +40,41 @@ const Dashboard = () => {
                 {activeReports.map((report, i) => (
                   <motion.div 
                     key={report.id} 
-                    className="report-card card flex gap-md"
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.1 }}
                   >
-                    <div className="report-thumb rounded-md overflow-hidden bg-tertiary" style={{width: '100px', flexShrink: 0}}>
-                      {report.images?.[0] ? (
-                        <div className="w-full h-full skeleton-shimmer"></div> // Mock image
-                      ) : (
-                         <div className="flex items-center justify-center h-full text-mono text-dim text-xs">NO IMG</div>
-                      )}
-                    </div>
-                    
-                    <div className="flex-1 flex flex-col justify-between py-1">
-                      <div>
-                        <div className="flex justify-between items-start mb-xs">
-                          <h3 className="font-semibold text-primary">{report.title}</h3>
-                          <StatusBadge status={report.status} />
-                        </div>
-                        <p className="text-sm text-secondary line-clamp-1">{report.location.address}</p>
+                    <Link to={`/report/${report.id}`} className="report-card card flex gap-md block w-full text-left">
+                      <div className="report-thumb rounded-md overflow-hidden bg-tertiary" style={{width: '100px', flexShrink: 0}}>
+                        {report.images?.[0] ? (
+                          <div className="w-full h-full skeleton-shimmer"></div> // Mock image
+                        ) : (
+                           <div className="flex items-center justify-center h-full text-mono text-dim text-xs">NO IMG</div>
+                        )}
                       </div>
                       
-                      <div className="flex items-center justify-between mt-sm">
-                        <div className="flex gap-sm">
-                          <SeverityBadge severity={report.severity} />
-                          <span className="text-xs text-mono text-dim self-center">{report.id}</span>
+                      <div className="flex-1 flex flex-col justify-between py-1">
+                        <div>
+                          <div className="flex-1 min-w-0 pr-4">
+                            <div className="flex justify-between items-start gap-4 mb-2">
+                              <h3 className="text-base font-semibold text-primary line-clamp-1 flex-1">{report.title}</h3>
+                              <div className="flex-shrink-0">
+                                <StatusBadge status={report.status} />
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-sm text-secondary line-clamp-1">{report.location.address}</p>
                         </div>
-                        <span className="text-xs text-dim">Updated {new Date(report.updatedAt).toLocaleDateString()}</span>
+                        
+                        <div className="flex items-center justify-between mt-sm">
+                          <div className="flex gap-sm">
+                            <SeverityBadge severity={report.severity} />
+                            <span className="text-xs text-mono text-dim self-center">{report.id}</span>
+                          </div>
+                          <span className="text-xs text-dim">Updated {new Date(report.updatedAt).toLocaleDateString()}</span>
+                        </div>
                       </div>
-                    </div>
+                    </Link>
                   </motion.div>
                 ))}
               </div>
@@ -88,7 +94,7 @@ const Dashboard = () => {
             {resolvedReports.length > 0 && (
               <div className="reports-list space-y-sm opacity-80">
                 {resolvedReports.map((report) => (
-                   <div key={report.id} className="report-card card flex gap-md border-dim">
+                   <Link key={report.id} to={`/report/${report.id}`} className="report-card card flex gap-md border-dim block w-full text-left">
                      <div className="flex-1 py-1">
                          <div className="flex justify-between items-center mb-xs">
                            <h3 className="text-sm text-primary">{report.title}</h3>
@@ -96,7 +102,7 @@ const Dashboard = () => {
                          </div>
                          <p className="text-xs text-secondary">{report.resolution}</p>
                      </div>
-                   </div>
+                   </Link>
                 ))}
               </div>
             )}
@@ -115,18 +121,42 @@ const Dashboard = () => {
             </div>
             <div style={{ height: '300px' }}>
               <MapView 
-                center={[12.9716, 77.5946]} 
+                center={[12.9352, 77.6245]} 
                 zoom={12} 
-                reports={reports.filter(r => r.status !== 'resolved')} // Show all nearby active
+                reports={reports} 
                 colorBy="status"
+                showUserLocation={true}
               />
             </div>
-            <div className="p-md">
-              <p className="text-xs text-secondary mb-sm">Showing active issues reported by citizens in your vicinity.</p>
-              <div className="flex justify-between text-xs font-mono">
-                <span className="text-amber">Pending</span>
-                <span className="text-signal-blue">Verified</span>
-                <span className="text-signal-purple">Assigned</span>
+            <div className="p-xl border-t border-dim">
+              <h4 className="text-sm font-semibold mb-xs text-primary">Map Indicators</h4>
+              <p className="text-xs text-secondary mb-4 leading-relaxed">Showing active local issues.</p>
+              
+              <div className="flex text-xs font-mono" style={{ flexWrap: 'wrap', rowGap: '12px', columnGap: '16px' }}>
+                <div className="flex items-center gap-2">
+                  <span style={{width:10, height:10, borderRadius:'50%', backgroundColor:'var(--amber)', boxShadow: '0 0 5px var(--amber)'}}></span>
+                  <span className="text-secondary">Pending</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span style={{width:10, height:10, borderRadius:'50%', backgroundColor:'var(--signal-blue)', boxShadow: '0 0 5px var(--signal-blue)'}}></span>
+                  <span className="text-secondary">Verified</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span style={{width:10, height:10, borderRadius:'50%', backgroundColor:'var(--signal-purple)', boxShadow: '0 0 5px var(--signal-purple)'}}></span>
+                  <span className="text-secondary">Assigned</span>
+                </div>
+                <div className="flex items-center gap-2 opacity-40">
+                  <span style={{width:10, height:10, borderRadius:'50%', backgroundColor:'var(--signal-green)'}}></span>
+                  <span className="text-secondary">Resolved</span>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-dim flex items-center gap-2 text-xs font-mono text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="var(--text-primary)" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                  <circle cx="12" cy="10" r="3" fill="#000"/>
+                </svg>
+                <span>You are here</span>
               </div>
             </div>
           </div>

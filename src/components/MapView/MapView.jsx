@@ -29,6 +29,22 @@ const STATUS_COLORS = {
   resolved: '#22c55e',
 }
 
+const userIcon = L.divIcon({
+  className: 'custom-marker user-marker',
+  html: `
+    <div style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transform: translateY(-20px);">
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="var(--text-primary)" stroke="#000" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 6px 8px rgba(0,0,0,0.8));">
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+        <circle cx="12" cy="10" r="3" fill="#000"/>
+      </svg>
+      <div class="marker-pulse" style="width: 40px; height: 40px; background: var(--text-primary); animation-duration: 2.5s; opacity: 0.15; position: absolute; z-index: -1; transform: translateY(16px);"></div>
+    </div>
+  `,
+  iconSize: [40, 40],
+  iconAnchor: [20, 20],
+  popupAnchor: [0, -40],
+})
+
 const MapView = ({
   reports = [],
   center = [12.9716, 77.5946],
@@ -39,6 +55,7 @@ const MapView = ({
   colorBy = 'severity',
   interactive = true,
   className = '',
+  showUserLocation = false,
 }) => {
   const markers = useMemo(() => {
     return reports.map(report => ({
@@ -65,6 +82,13 @@ const MapView = ({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        
+        {showUserLocation && (
+          <Marker position={center} icon={userIcon}>
+             <Popup><div className="map-popup text-center"><strong>You are here</strong></div></Popup>
+          </Marker>
+        )}
+
         {markers.map(report => (
           <Marker
             key={report.id}

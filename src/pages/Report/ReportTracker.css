@@ -1,0 +1,143 @@
+.tracker-page {
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+.tracker-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-xl);
+}
+
+/* Vertical Timeline */
+.timeline {
+  position: relative;
+  padding-left: 2rem;
+  margin-top: var(--space-md);
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 8px;
+  width: 2px;
+  background: var(--border-dim);
+  z-index: 1;
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: var(--space-xl);
+}
+
+.timeline-item:last-child {
+  margin-bottom: 0;
+}
+
+.timeline-marker {
+  position: absolute;
+  left: -2rem;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  border: 2px solid var(--border-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  color: transparent;
+  transition: all 0.3s ease;
+}
+
+/* Overriding icon size for check circle in marker */
+.timeline-marker svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* States */
+.timeline-item.completed .timeline-marker {
+  background: var(--signal-green);
+  border-color: var(--signal-green);
+  color: var(--bg-primary);
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.3);
+}
+
+.timeline-item.current .timeline-marker {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: var(--bg-primary);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);
+}
+
+/* Connector Line Highlighting */
+.timeline-item.completed::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: calc(-2rem + 8px);
+  bottom: calc(-1 * var(--space-xl));
+  width: 2px;
+  background: var(--signal-green);
+  z-index: 1;
+}
+.timeline-item:last-child::before {
+  display: none;
+}
+.timeline-item.current::before {
+  content: '';
+  position: absolute;
+  top: 18px;
+  left: calc(-2rem + 8px);
+  bottom: calc(-1 * var(--space-xl));
+  width: 2px;
+  background: linear-gradient(to bottom, var(--amber), var(--border-dim));
+  z-index: 1;
+}
+
+
+.timeline-content {
+  padding-top: -2px;
+}
+
+.timeline-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.timeline-item.completed .timeline-title,
+.timeline-item.current .timeline-title {
+  color: var(--text-primary);
+}
+
+.timeline-desc {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+
+.timeline-item.completed .timeline-desc,
+.timeline-item.current .timeline-desc {
+  color: var(--text-secondary);
+}
+
+/* Utils */
+.max-w-4xl { max-width: 56rem; }
+.pt-24 { padding-top: 6rem; }
+.pb-20 { padding-bottom: 5rem; }
+.px-4 { padding-left: 1rem; padding-right: 1rem; }
+.gap-6 { gap: 1.5rem; }
+.p-0 { padding: 0; }
+.p-5 { padding: 1.25rem; }
+.h-48 { height: 12rem; }
+
+@media (max-width: 768px) {
+  .tracker-grid {
+    grid-template-columns: 1fr;
+  }
+}

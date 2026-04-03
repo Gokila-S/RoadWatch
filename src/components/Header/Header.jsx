@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ClipboardList, Bot, CheckCircle, AlertTriangle, MapPin } from 'lucide-react'
 import useStore from '../../store/useStore'
 import './Header.css'
 
@@ -33,9 +34,11 @@ const Header = () => {
   const navLinks = isAuthenticated ? (
     userRole === 'superadmin' ? [
       { path: '/admin', label: 'Command Center' },
+      { path: '/reports', label: 'All Reports' },
       { path: '/analytics', label: 'Analytics' },
     ] : userRole === 'admin' ? [
       { path: '/admin', label: 'Command Center' },
+      { path: '/reports', label: 'All Reports' },
       { path: '/analytics', label: 'Analytics' },
     ] : [
       { path: '/dashboard', label: 'My Reports' },
@@ -96,40 +99,58 @@ const Header = () => {
                 </button>
 
                 <AnimatePresence>
-                  {notifOpen && (
-                    <motion.div
-                      className="notif-dropdown glass-panel"
-                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <div className="notif-header">
-                        <span className="text-mono">NOTIFICATIONS</span>
-                        <span className="badge badge-pending"><span className="badge-dot"></span>{unreadCount} new</span>
-                      </div>
-                      <div className="notif-list">
-                        {notifications.map(notif => (
-                          <div
-                            key={notif.id}
-                            className={`notif-item ${!notif.read ? 'notif-unread' : ''}`}
-                            onClick={() => markNotificationRead(notif.id)}
-                          >
-                            <div className={`notif-icon-wrap notif-${notif.type}`}>
-                              {notif.type === 'status' && '📋'}
-                              {notif.type === 'update' && '🤖'}
-                              {notif.type === 'resolved' && '✅'}
-                              {notif.type === 'alert' && '🚨'}
+                  {notifOpen && (() => {
+                    const isAdmin = ['admin', 'superadmin'].includes(userRole)
+                    
+                    const adminNotifs = [
+                      { id: 901, type: 'alert', message: '[CRITICAL ALERT] Severe road hazard detected in Sector 4. Immediate dispatch required.', time: '2m ago', read: false },
+                      { id: 902, type: 'update', message: '[AI INTELLIGENCE] Detected cluster of 5 related pothole reports near Bellary Road. Auto-merged.', time: '1h ago', read: false },
+                      { id: 903, type: 'status', message: '[DISPATCH] Field Unit Alpha arrived on site at NH-48.', time: '2h ago', read: true },
+                      { id: 904, type: 'resolved', message: '[SLA MET] 3 high-severity anomalies resolved within 48h limit.', time: '5h ago', read: true }
+                    ]
+                    
+                    const displayNotifs = isAdmin ? adminNotifs : notifications
+                    const activeUnread = displayNotifs.filter(n => !n.read).length
+                    
+                    return (
+                      <motion.div
+                        className="notif-dropdown glass-panel"
+                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <div className="notif-header" style={{ borderBottom: isAdmin ? '1px solid var(--signal-cyan)' : '1px solid var(--border-dim)' }}>
+                          <span className="text-mono" style={{ color: isAdmin ? 'var(--signal-cyan)' : 'inherit', fontWeight: isAdmin ? 'bold' : 'normal' }}>
+                            {isAdmin ? 'SYSTEM ALERT LOG' : 'NOTIFICATIONS'}
+                          </span>
+                          <span className="badge badge-pending"><span className="badge-dot"></span>{activeUnread} new</span>
+                        </div>
+                        <div className="notif-list">
+                          {displayNotifs.map(notif => (
+                            <div
+                              key={notif.id}
+                              className={`notif-item ${!notif.read ? 'notif-unread' : ''}`}
+                              onClick={() => markNotificationRead(notif.id)}
+                            >
+                              <div className={`notif-icon-wrap notif-${notif.type}`} style={{ borderRadius: isAdmin ? '4px' : 'var(--radius-md)' }}>
+                                {notif.type === 'status' && <ClipboardList size={20} />}
+                                {notif.type === 'update' && <Bot size={20} />}
+                                {notif.type === 'resolved' && <CheckCircle size={20} />}
+                                {notif.type === 'alert' && <AlertTriangle size={20} />}
+                              </div>
+                              <div className="notif-content">
+                                <p style={{ fontFamily: isAdmin ? 'var(--font-mono)' : 'var(--font-body)', fontSize: isAdmin ? '0.75rem' : '0.82rem' }}>
+                                  {notif.message}
+                                </p>
+                                <span className="notif-time">{notif.time}</span>
+                              </div>
                             </div>
-                            <div className="notif-content">
-                              <p>{notif.message}</p>
-                              <span className="notif-time">{notif.time}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
+                          ))}
+                        </div>
+                      </motion.div>
+                    )
+                  })()}
                 </AnimatePresence>
               </div>
 
@@ -139,9 +160,15 @@ const Header = () => {
                   onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false) }}
                   id="profile-menu"
                 >
-                  <div className="profile-avatar">
-                    {user?.name?.charAt(0)}
-                  </div>
+                  {['admin', 'superadmin'].includes(userRole) ? (
+                    <div className="admin-avatar-hex-sm" style={{ width: '24px', height: '24px', borderRadius: '4px' }}>
+                      <span className="hex-inner-sm" style={{ fontSize: '0.7rem' }}>{user?.name?.charAt(0)}</span>
+                    </div>
+                  ) : (
+                    <div className="profile-avatar">
+                      {user?.name?.charAt(0)}
+                    </div>
+                  )}
                   <span className="profile-name">{user?.name}</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <polyline points="6 9 12 15 18 9"/>

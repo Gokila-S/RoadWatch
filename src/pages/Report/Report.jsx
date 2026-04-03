@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
+import { Camera, MapPin, CheckCircle2, ChevronRight, AlertTriangle, CloudRain, Construction, MapPinOff, ScanSearch } from 'lucide-react'
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
 import { AiConfidenceBadge } from '../../components/StatusBadge/StatusBadge'
@@ -9,13 +10,13 @@ import './Report.css'
 const Report = () => {
   const navigate = useNavigate()
   const { addReport } = useStore()
-  const [step, setStep] = useState(1) // 1: Capture, 2: Details, 3: Success
+  const [step, setStep] = useState(1) // 1: Camera Focus, 2: Details Focus, 3: Success
   const [image, setImage] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [aiData, setAiData] = useState(null)
   
   const [formData, setFormData] = useState({
-    title: '',
+    title: 'Reported Issue',
     description: '',
     category: '',
     severity: 'medium',
@@ -24,31 +25,30 @@ const Report = () => {
   const [location, setLocation] = useState({
     lat: 12.9716,
     lng: 77.5946,
-    address: 'Fetching location...',
+    address: 'Detecting precise location...',
   })
 
   // Simulated AI constraints
   useEffect(() => {
-    if (image && step === 1) {
+    if (image && step === 2) {
       setAnalyzing(true)
       setTimeout(() => {
+        const discoveredSeverity = formData.category === 'pothole' ? 'high' : 'medium'
         setAiData({
-          category: 'pothole',
-          confidence: 94,
-          severity: 'high',
-          identifiedFeatures: ['sharp_edge', 'depth > 2inch', 'traffic_lane'],
+          category: formData.category || 'unknown',
+          confidence: 96,
+          severity: discoveredSeverity,
+          identifiedFeatures: ['edge_detection_match', 'depth_estimated', 'location_verified'],
         })
         setFormData(prev => ({
           ...prev,
-          category: 'pothole',
-          severity: 'high',
-          title: 'Deep Pothole Detected'
+          severity: discoveredSeverity,
+          title: prev.category ? `${prev.category.charAt(0).toUpperCase() + prev.category.slice(1)} Detected` : 'Issue Detected'
         }))
         setAnalyzing(false)
-        setStep(2)
-      }, 2500)
+      }, 2000)
     }
-  }, [image])
+  }, [image, formData.category, step])
   
   // Simulated Location Fetch
   useEffect(() => {
@@ -56,9 +56,9 @@ const Report = () => {
       setLocation({
         lat: 12.9352,
         lng: 77.6245,
-        address: 'Outer Ring Road, Near Tech Park, Sector 4'
+        address: 'Sector 4, Outer Ring Road, Bengaluru'
       })
-    }, 1500)
+    }, 1200)
   }, [])
 
   const handleImageUpload = (e) => {
@@ -66,25 +66,32 @@ const Report = () => {
     if (file) {
       const url = URL.createObjectURL(file)
       setImage(url)
+      setStep(2) // Jump straight to details
     }
   }
 
-  const handleSubmit = (e) => {
-    e.preventDefault()
-    
+  const handleCategorySelect = (cat) => {
+    setFormData(prev => ({ ...prev, category: cat }))
+  }
+
+  const handleSubmit = () => {
+    const id = `RW-${Math.floor(1000 + Math.random() * 9000)}`
     addReport({
+      id,
       title: formData.title,
       description: formData.description,
-      category: formData.category,
+      category: formData.category || 'hazard',
       severity: formData.severity,
       status: 'pending',
       location: location,
-      district: 'Bangalore East', // Mock inferred
+      district: 'Bangalore East', 
       reportedBy: 'citizen_current',
       reporterName: 'Current User',
       assignedTo: null,
       aiConfidence: aiData?.confidence || 0,
       images: [image],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       slaDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       resolution: null,
     })
@@ -93,237 +100,228 @@ const Report = () => {
   }
 
   return (
-    <div className="report-page container">
-      <div className="report-header">
-        <h1 className="heading-display heading-md">Report Infrastructure Issue</h1>
-        <div className="step-indicator">
-          <div className={`step-dot ${step >= 1 ? 'active' : ''}`}>1</div>
-          <div className={`step-line ${step >= 2 ? 'active' : ''}`}></div>
-          <div className={`step-dot ${step >= 2 ? 'active' : ''}`}>2</div>
-          <div className={`step-line ${step >= 3 ? 'active' : ''}`}></div>
-          <div className={`step-dot ${step >= 3 ? 'active' : ''}`}>3</div>
-        </div>
-      </div>
+    <div className="report-flow">
+      <AnimatePresence mode="wait">
+        
+        {/* STEP 1: CAMERA OPEN IMMEDIATELY */}
+        {step === 1 && (
+          <motion.div
+            key="step1"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="camera-fullscreen focus-overlay"
+          >
+             <div className="header-camera">
+               <button onClick={() => navigate(-1)} className="btn-icon bg-secondary/80 backdrop-blur" style={{borderRadius: '50%', color: '#fff', border: '1px solid rgba(255,255,255,0.1)'}}>✕</button>
+               <span className="text-sm font-semibold tracking-wide" style={{textShadow: '0 2px 4px rgba(0,0,0,0.8)'}}>Capture Issue</span>
+               <div style={{width: 40}}></div>
+             </div>
 
-      <div className="report-content">
-        <AnimatePresence mode="wait">
-          {step === 1 && (
-            <motion.div
-              key="step1"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="step-container"
-            >
-              <div className="camera-card glass-panel">
-                {!image ? (
-                  <div className="upload-area">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      id="camera-input"
-                      onChange={handleImageUpload}
-                      style={{ display: 'none' }}
-                    />
-                    <label htmlFor="camera-input" className="upload-label">
-                      <div className="upload-icon-pulse">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" strokeWidth="1.5">
-                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                          <circle cx="12" cy="13" r="4"/>
-                        </svg>
-                      </div>
-                      <h3 className="heading-display">Capture Issue</h3>
-                      <p className="text-secondary">Take a clear photo of the hazard</p>
-                      <span className="btn btn-primary mt-4">Open Camera / Gallery</span>
-                    </label>
-                  </div>
-                ) : (
-                  <div className="image-preview-area">
-                    <img src={image} alt="Issue preview" className="preview-img" />
-                    {analyzing && (
-                      <div className="ai-scanning-overlay">
+             <div className="camera-viewfinder">
+                <div className="viewfinder-frame">
+                   <div className="bracket tl"></div><div className="bracket tr"></div>
+                   <div className="bracket bl"></div><div className="bracket br"></div>
+                   <div className="crosshair"></div>
+                </div>
+
+                <div className="camera-text-overlay z-10">
+                  <h2 className="heading-display text-white text-xl pb-2" style={{textShadow: '0 2px 8px rgba(0,0,0,0.8)'}}>
+                    Point at issue
+                  </h2>
+                  <p className="text-sm text-white opacity-80" style={{textShadow: '0 1px 4px rgba(0,0,0,0.8)'}}>
+                    Ensure the hazard is clearly visible
+                  </p>
+                </div>
+
+                <div className="camera-controls-safe-area z-10">
+                  <button 
+                     onClick={() => {
+                       setImage('https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&q=80')
+                       setStep(2)
+                     }} 
+                     className="capture-btn"
+                     aria-label="Capture Issue"
+                  >
+                     <div className="capture-inner"></div>
+                  </button>
+                  <p className="text-xs font-mono text-center mt-6 tracking-widest text-white/70">TAP TO CAPTURE</p>
+                </div>
+             </div>
+          </motion.div>
+        )}
+
+        {/* STEP 2: DETAILS (WHAT'S THE ISSUE) */}
+        {step === 2 && (
+          <motion.div
+            key="step2"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="details-screen container pt-24 pb-24 max-w-4xl mx-auto"
+          >
+             <div className="flex justify-between items-center mb-8 pb-4 border-b border-dim">
+                <button onClick={() => setStep(1)} className="text-secondary text-sm flex gap-xs items-center font-medium hover:text-white transition-colors">
+                  ← Retake Photo
+                </button>
+                <div className="text-xs font-mono text-dim tracking-wider">REPORT CONTEXT // STEP 02</div>
+             </div>
+
+             <div className="grid md-grid-2 gap-8">
+               {/* Left Column: Media & Location */}
+               <div className="flex flex-col gap-6">
+                 
+                 {/* Image Context with AI Scanner */}
+                 <div className="card p-0 overflow-hidden bg-black group h-64 shadow-xl" style={{ position: 'relative' }}>
+                   <img src={image} className={`w-full h-full object-cover transition-all duration-700 ${analyzing ? 'opacity-50 grayscale' : 'opacity-90'}`} style={{ display: 'block' }} alt="Captured issue" />
+                   
+                   {analyzing && (
+                      <div className="ai-scanning-overlay" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}>
                         <div className="scanner-line"></div>
-                        <div className="scanner-text text-mono">
-                          <span className="animate-pulse">AI VISION PROCESSING...</span>
-                        </div>
+                        <div className="scanner-text">AI SCANNING</div>
                         <div className="scanner-corners">
                           <i></i><i></i><i></i><i></i>
                         </div>
                       </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                   )}
+                   
+                   {aiData && !analyzing && (
+                      <motion.div initial={{opacity: 0, scale: 0.8}} animate={{opacity: 1, scale: 1}} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 20 }}>
+                         <div className="bg-signal-green/20 backdrop-blur-md border border-signal-green text-signal-green px-3 py-1.5 rounded-full text-xs font-mono font-semibold shadow-[0_0_15px_rgba(34,197,94,0.3)]" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                           <CheckCircle2 size={14} /> HI-RES VERIFIED
+                         </div>
+                      </motion.div>
+                   )}
+                 </div>
 
-              <div className="map-preview-card glass-panel-sm mt-4">
-                <div className="map-preview-header">
-                  <span className="text-mono text-dim">// DETECTED LOCATION</span>
-                  <p className="location-text">{location.address}</p>
-                </div>
-                <div style={{ height: '150px' }}>
-                  <MapView 
-                    center={[location.lat, location.lng]} 
-                    zoom={15} 
-                    reports={[{ id: 'curr', location, severity: 'medium', status: 'pending' }]}
-                    interactive={false}
-                  />
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {step === 2 && (
-            <motion.div
-              key="step2"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="step-container"
-            >
-              <div className="report-grid">
-                <div className="form-column card">
-                  <h3 className="heading-display mb-4 text-accent">Submit Details</h3>
-                  <form onSubmit={handleSubmit} className="report-form">
-                    <div className="input-group">
-                      <label className="input-label">Issue Title</label>
-                      <input
-                        type="text"
-                        className="input-field"
-                        value={formData.title}
-                        onChange={(e) => setFormData({...formData, title: e.target.value})}
-                        required
-                      />
+                 {/* Location Box */}
+                 <div className="card bg-secondary border border-dim p-5 relative overflow-hidden shadow-lg">
+                    <div className="relative z-10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MapPin className="text-signal-cyan" size={16} />
+                        <span className="text-xs text-dim font-mono tracking-wide">AUTO-DETECTED GEO</span>
+                      </div>
+                      <p className="text-base font-semibold text-primary leading-tight w-2/3">{location.address}</p>
+                      <p className="text-xs text-secondary font-mono mt-3">LAT: {location.lat} // LNG: {location.lng}</p>
                     </div>
-                    
-                    <div className="form-row">
-                      <div className="input-group flex-1">
-                        <label className="input-label">Category</label>
-                        <select 
-                          className="input-field"
-                          value={formData.category}
-                          onChange={(e) => setFormData({...formData, category: e.target.value})}
-                          required
+                    {/* Rendered Map Background Style */}
+                    <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-30 select-none pointer-events-none fade-left">
+                       <MapView center={[location.lat, location.lng]} zoom={14} interactive={false} reports={[{id:'1', location, severity:'medium'}]} />
+                    </div>
+                 </div>
+
+               </div>
+
+               {/* Right Column: Classification & Action */}
+               <div className="flex flex-col gap-6 display-flex-1">
+                 
+                 <div className="card bg-tertiary border border-dim p-6 shadow-lg">
+                   <div className="mb-6">
+                     <h3 className="text-lg font-semibold mb-2">Issue Classification</h3>
+                     <p className="text-sm text-secondary">Select the primary category to initiate standard operating procedure protocols.</p>
+                   </div>
+                   
+                   <div className="grid grid-cols-2 gap-3 mb-6">
+                     {[
+                       { id: 'pothole', icon: <AlertTriangle size={20}/>, label: 'Pothole' },
+                       { id: 'crack', icon: <Construction size={20}/>, label: 'Road Crack' },
+                       { id: 'waterlogging', icon: <CloudRain size={20}/>, label: 'Waterlogging' },
+                       { id: 'hazard', icon: <MapPinOff size={20}/>, label: 'Hazard' }
+                     ].map(cat => (
+                        <button 
+                          key={cat.id}
+                          onClick={() => handleCategorySelect(cat.id)}
+                          className={`
+                            flex flex-col items-center justify-center gap-3 p-4 rounded-xl border transition-all
+                            ${formData.category === cat.id 
+                              ? 'border-amber bg-amber/10 text-amber shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-1 ring-amber/50' 
+                              : 'border-subtle bg-primary text-secondary hover:border-medium hover:bg-surface hover:text-white'}
+                          `}
                         >
-                          <option value="">Select Category</option>
-                          <option value="pothole">Pothole</option>
-                          <option value="crack">Road Crack</option>
-                          <option value="hazard">Obstruction / Hazard</option>
-                          <option value="waterlogging">Waterlogging</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-                      
-                      <div className="input-group flex-1">
-                        <label className="input-label">Severity Assessment</label>
-                        <select 
-                          className="input-field"
-                          value={formData.severity}
-                          onChange={(e) => setFormData({...formData, severity: e.target.value})}
-                          required
-                        >
-                          <option value="low">Low (Cosmetic)</option>
-                          <option value="medium">Medium (Requires attention)</option>
-                          <option value="high">High (Dangerous)</option>
-                          <option value="critical">Critical (Immediate action)</option>
-                        </select>
-                      </div>
-                    </div>
+                          {cat.icon}
+                          <span className="font-semibold text-sm">{cat.label}</span>
+                        </button>
+                     ))}
+                   </div>
 
-                    <div className="input-group mt-2">
-                      <label className="input-label">Additional Details</label>
-                      <textarea
-                        className="input-field"
-                        rows="3"
-                        placeholder="Provide any additional context..."
-                        value={formData.description}
-                        onChange={(e) => setFormData({...formData, description: e.target.value})}
-                      ></textarea>
-                    </div>
+                   {/* AI Info Inline Log */}
+                   <AnimatePresence>
+                     {formData.category && (
+                       <motion.div
+                         initial={{ opacity: 0, y: -10, height: 0 }}
+                         animate={{ opacity: 1, y: 0, height: 'auto' }}
+                         className="mb-6 overflow-hidden"
+                       >
+                         {analyzing ? (
+                            <div className="flex items-center gap-3 text-signal-cyan font-mono text-xs bg-signal-cyan/10 p-3 rounded border border-signal-cyan/20">
+                              <ScanSearch size={16} className="animate-pulse" /> Running computer vision diagnostics...
+                            </div>
+                         ) : (
+                            <div className="flex items-center justify-between text-signal-green font-mono text-xs bg-signal-green/10 p-3 rounded border border-signal-green/20">
+                              <div className="flex items-center gap-2"><CheckCircle2 size={16}/> Match Confirmed</div>
+                              <span>Confidence: {aiData?.confidence}%</span>
+                            </div>
+                         )}
+                       </motion.div>
+                     )}
+                   </AnimatePresence>
 
-                    <div className="form-actions mt-4">
-                      <button type="button" className="btn btn-ghost" onClick={() => setStep(1)}>
-                        Retake Photo
-                      </button>
-                      <button type="submit" className="btn btn-primary">
-                        Submit Report
-                      </button>
-                    </div>
-                  </form>
-                </div>
+                   <div className="mb-2">
+                     <label className="text-xs font-mono text-dim mb-2 block tracking-wide">ADDITIONAL INTELLIGENCE (OPTIONAL)</label>
+                     <textarea
+                       className="w-full bg-primary border border-dim rounded-lg p-3 font-body text-sm outline-none focus:border-amber transition-colors resize-none text-white focus:ring-1 focus:ring-amber/50"
+                       placeholder="Specify landmarks, scope of damage, or immediate risks..."
+                       rows={3}
+                       value={formData.description}
+                       onChange={e => setFormData({...formData, description: e.target.value})}
+                     ></textarea>
+                   </div>
+                 </div>
 
-                <div className="ai-column">
-                  <div className="ai-insight-card glass-panel border-accent">
-                    <div className="ai-header mb-4">
-                      <span className="text-mono text-accent">AI VALIDATION RESULTS</span>
-                    </div>
-                    
-                    <div className="ai-summary flex items-center justify-between mb-4">
-                      <div>
-                        <p className="text-secondary text-sm">Detected Classification</p>
-                        <h4 className="title-lg capitalize">{aiData?.category}</h4>
-                      </div>
-                      <AiConfidenceBadge confidence={aiData?.confidence || 0} />
-                    </div>
+                 <button 
+                    onClick={handleSubmit}
+                    disabled={!formData.category || analyzing}
+                    className={`btn btn-primary btn-lg w-full flex items-center justify-center gap-2 py-4 shadow-lg ${
+                      (analyzing || !formData.category) ? 'opacity-50 pointer-events-none grayscale' : 'hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]'
+                    }`}
+                 >
+                    {analyzing ? 'System Analyzing...' : 'Deploy Report Protocol'} <ChevronRight size={18} />
+                 </button>
+               </div>
+             </div>
+          </motion.div>
+        )}
 
-                    <div className="ai-features">
-                      <p className="text-secondary text-sm mb-2">Identified Signatures:</p>
-                      <div className="flex gap-xs flex-wrap">
-                        {aiData?.identifiedFeatures.map(f => (
-                          <span key={f} className="badge" style={{ background: 'var(--bg-tertiary)' }}>{f.replace('_', ' ')}</span>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <div className="mt-4 p-3 bg-surface rounded-md border-dim">
-                      <p className="text-sm text-dim">
-                        <span className="text-signal-green">✓ Location verified</span><br/>
-                        <span className="text-signal-green">✓ Image integrity checked</span><br/>
-                        <span className="text-signal-green">✓ Duplicate search negative</span>
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="image-thumb mt-4 rounded-lg overflow-hidden border-dim">
-                    <img src={image} alt="Thumb" style={{width: '100%', height: '120px', objectFit: 'cover'}}/>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
+        {/* STEP 3: SUCCESS (INSTANT) */}
+        {step === 3 && (
+          <motion.div
+            key="step3"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="success-screen flex flex-col items-center justify-center min-h-screen px-6 text-center"
+          >
+             <div className="w-20 h-20 bg-signal-green/20 rounded-full flex items-center justify-center mb-6">
+                <CheckCircle2 size={40} className="text-signal-green" />
+             </div>
+             <h2 className="heading-display text-2xl mb-2">Report Submitted</h2>
+             <p className="text-secondary mb-8">Thank you. Your report has been logged and routed to the proper authorities.</p>
+             
+             <div className="bg-surface border border-subtle px-6 py-4 rounded-xl mb-10 w-full max-w-sm flex items-center justify-between">
+                <span className="text-dim text-sm font-medium">Tracking ID</span>
+                <span className="font-mono text-amber font-semibold tracking-wider">RW-2841</span>
+             </div>
 
-          {step === 3 && (
-            <motion.div
-              key="step3"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="success-container glass-panel"
-            >
-              <div className="success-icon-wrap">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                  <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-              </div>
-              <h2 className="heading-display">Report Submitted</h2>
-              <p className="text-secondary mb-4 text-center max-w-md">
-                Your report has been received and logged into the central system. It will be routed to the appropriate district assigned team shortly.
-              </p>
-              <div className="tracking-id text-mono mb-4">
-                 TRACKING ID: <span className="text-accent">RW-2026-0011</span>
-              </div>
-              <div className="flex gap-md mt-4">
-                <button className="btn btn-secondary" onClick={() => navigate('/dashboard')}>
-                  Go to Dashboard
-                </button>
-                <button className="btn btn-primary" onClick={() => { setImage(null); setStep(1); }}>
-                  Report Another
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+             <div className="flex flex-col w-full max-w-sm gap-3">
+               <button onClick={() => navigate('/dashboard')} className="btn btn-secondary w-full justify-center">
+                 View My Reports
+               </button>
+               <button onClick={() => navigate('/')} className="btn btn-ghost w-full justify-center">
+                 Back to Map
+               </button>
+             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

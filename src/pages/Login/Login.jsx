@@ -13,17 +13,19 @@ const Login = () => {
   const [otp, setOtp] = useState('')
   const [adminPin, setAdminPin] = useState('')
 
+  const [name, setName] = useState('')
+
   const handleSendOtp = (e) => {
     e.preventDefault()
-    if (phoneNumber.length === 10) {
+    if (phoneNumber.length === 10 && name.trim().length > 0) {
       setOtpSent(true)
     }
   }
 
   const handleVerifyOtp = (e) => {
     e.preventDefault()
-    if (otp === '1234') { // Mock OTP
-      login('citizen')
+    if (otp === '1234') { 
+      login('citizen', name)
       navigate('/dashboard')
     } else {
       alert('Invalid OTP. Use 1234')
@@ -84,6 +86,17 @@ const Login = () => {
             {role === 'citizen' ? (
               !otpSent ? (
                 <form onSubmit={handleSendOtp} className="login-form">
+                  <div className="input-group mb-4">
+                    <label className="input-label">Full Name</label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      placeholder="e.g. Priya Sharma"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                    />
+                  </div>
                   <div className="input-group">
                     <label className="input-label">Mobile Number</label>
                     <div className="phone-input">
@@ -98,7 +111,7 @@ const Login = () => {
                       />
                     </div>
                   </div>
-                  <button type="submit" className="btn btn-primary btn-lg w-full mt-4" disabled={phoneNumber.length !== 10}>
+                  <button type="submit" className="btn btn-primary btn-lg w-full mt-4" disabled={phoneNumber.length !== 10 || name.trim().length === 0}>
                     Request Security OTP
                   </button>
                   <p className="text-dim text-mono login-hint">Use any 10-digit number</p>

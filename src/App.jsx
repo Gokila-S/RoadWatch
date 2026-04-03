@@ -3,8 +3,10 @@ import Header from './components/Header/Header'
 import Landing from './pages/Landing/Landing'
 import Login from './pages/Login/Login'
 import Report from './pages/Report/Report'
+import ReportTracker from './pages/Report/ReportTracker'
 import Dashboard from './pages/Dashboard/Dashboard'
 import Admin from './pages/Admin/Admin'
+import ReportsList from './pages/ReportsList/ReportsList'
 import Analytics from './pages/Analytics/Analytics'
 import useStore from './store/useStore'
 
@@ -35,6 +37,14 @@ function App() {
           {/* Citizen Routes */}
           <Route path="/report" element={<Report />} />
           <Route 
+            path="/report/:id" 
+            element={
+              <ProtectedRoute allowedRoles={['citizen']}>
+                <ReportTracker />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
             path="/dashboard" 
             element={
               <ProtectedRoute allowedRoles={['citizen']}>
@@ -49,6 +59,14 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
                 <Admin />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/reports" 
+            element={
+              <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+                <ReportsList />
               </ProtectedRoute>
             } 
           />
