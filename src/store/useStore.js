@@ -391,23 +391,73 @@ const useStore = create((set, get) => ({
     return data
   },
 
+  districtAdmins: [],
+
+  fetchDistrictAdmins: async () => {
+    const token = get().token
+    const response = await fetch(`${API_BASE_URL}/api/admin/district-admins`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not fetch district admins')
+    }
+
+    set({ districtAdmins: data.district_admins || [] })
+    return data.district_admins || []
+  },
+
   logout: () => {
     localStorage.removeItem('rw_token')
     localStorage.removeItem('rw_user')
-    set({ user: null, token: null, isAuthenticated: false, userRole: null, authError: null })
+    set({ user: null, token: null, isAuthenticated: false, userRole: null, authError: null, districtAdmins: [] })
   },
 
   // Reports
-  reports: MOCK_REPORTS,
+  reports: [],
   selectedReport: null,
   filterStatus: 'all',
   filterSeverity: 'all',
   filterDistrict: 'all',
+  reportsLoading: false,
 
   setSelectedReport: (report) => set({ selectedReport: report }),
   setFilterStatus: (status) => set({ filterStatus: status }),
   setFilterSeverity: (severity) => set({ filterSeverity: severity }),
   setFilterDistrict: (district) => set({ filterDistrict: district }),
+
+  fetchReports: async (query = {}) => {
+    const token = get().token
+    if (!token) {
+      set({ reports: [] })
+      return []
+    }
+
+    set({ reportsLoading: true })
+
+    const params = new URLSearchParams()
+    Object.entries(query).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.set(key, value)
+      }
+    })
+
+    const response = await fetch(`${API_BASE_URL}/api/reports${params.toString() ? `?${params.toString()}` : ''}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      set({ reportsLoading: false })
+      throw new Error(data.message || 'Could not fetch reports')
+    }
+
+    set({ reports: data.reports || [], reportsLoading: false })
+    return data.reports || []
+  },
 
   getFilteredReports: () => {
     const { reports, filterStatus, filterSeverity, filterDistrict } = get()
@@ -419,13 +469,74 @@ const useStore = create((set, get) => ({
     })
   },
 
-  addReport: (report) => set(state => ({
-    reports: [{ ...report, id: `RW-2026-${String(state.reports.length + 1).padStart(4, '0')}`, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, ...state.reports]
-  })),
+  createReport: async (payload) => {
+    const token = get().token
+    const response = await fetch(`${API_BASE_URL}/api/reports`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    })
 
-  updateReportStatus: (id, status) => set(state => ({
-    reports: state.reports.map(r => r.id === id ? { ...r, status, updatedAt: new Date().toISOString() } : r)
-  })),
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not create report')
+    }
+
+    set((state) => ({ reports: [data.report, ...state.reports] }))
+    return data.report
+  },
+
+  uploadReportMedia: async (file) => {
+    const token = get().token
+    if (!token) {
+      throw new Error('Not authenticated')
+    }
+
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not upload image')
+    }
+
+    return data.media?.url
+  },
+
+  updateReportStatus: async (id, status, resolution = '') => {
+    const token = get().token
+    const response = await fetch(`${API_BASE_URL}/api/reports/${id}/status`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ status, resolution }),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not update report status')
+    }
+
+    set((state) => ({
+      reports: state.reports.map((r) => (r.id === id ? data.report : r)),
+      selectedReport: state.selectedReport?.id === id ? data.report : state.selectedReport,
+    }))
+
+    return data.report
+  },
 
   // Notifications
   notifications: MOCK_NOTIFICATIONS,
@@ -442,8 +553,41 @@ const useStore = create((set, get) => ({
 
   // Data
   districts: DISTRICTS,
-  analyticsMonthly: ANALYTICS_MONTHLY,
-  issueCategories: ISSUE_CATEGORIES,
+  analyticsMonthly: [],
+  issueCategories: [],
+  analyticsSummary: null,
+
+  fetchAnalytics: async () => {
+    const token = get().token
+    if (!token) return null
+
+    const response = await fetch(`${API_BASE_URL}/api/analytics`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not fetch analytics')
+    }
+
+    set({
+      analyticsSummary: data.stats,
+      districts: (data.districtPerformance || []).map((d, idx) => ({
+        id: String(idx + 1),
+        name: d.district,
+        admin: d.admin,
+        totalIssues: d.total_issues,
+        resolved: d.resolved,
+        pending: d.pending,
+        assigned: d.assigned,
+        avgResolution: 'N/A',
+      })),
+      issueCategories: data.issueCategories || [],
+      analyticsMonthly: data.monthlyTrend || [],
+    })
+
+    return data
+  },
 
   // Stats
   getStats: () => {
@@ -455,10 +599,10 @@ const useStore = create((set, get) => ({
       assigned: reports.filter(r => r.status === 'assigned').length,
       resolved: reports.filter(r => r.status === 'resolved').length,
       critical: reports.filter(r => r.severity === 'critical').length,
-      avgAiConfidence: Math.round(reports.reduce((a, r) => a + r.aiConfidence, 0) / reports.length),
-      totalResolved: 786,
-      totalReported: 986,
-      citizenCount: 12450,
+      avgAiConfidence: reports.length > 0 ? Math.round(reports.reduce((a, r) => a + r.aiConfidence, 0) / reports.length) : 0,
+      totalResolved: reports.filter(r => r.status === 'resolved').length,
+      totalReported: reports.length,
+      citizenCount: 0,
     }
   },
 }))

@@ -1,0 +1,52 @@
+.super-admin-page {
+  display: grid;
+  gap: 20px;
+  padding-top: 32px;
+  padding-bottom: 32px;
+}
+
+.super-admin-panel,
+.super-admin-list {
+  padding: 20px;
+}
+
+.super-admin-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.super-admin-form .btn {
+  margin-top: 8px;
+  width: fit-content;
+}
+
+.super-admin-message {
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+.super-admin-message.success {
+  color: var(--signal-green);
+}
+
+.super-admin-message.error {
+  color: #ff6b6b;
+}
+
+.super-admin-table-wrap {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+.super-admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.super-admin-table th,
+.super-admin-table td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid var(--border-dim);
+}

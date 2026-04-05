@@ -1,10 +1,17 @@
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar } from 'recharts'
 import useStore from '../../store/useStore'
 import './Analytics.css'
 
 const Analytics = () => {
-  const { analyticsMonthly, issueCategories, districts } = useStore()
+  const { analyticsMonthly, issueCategories, districts, analyticsSummary, fetchAnalytics } = useStore()
+
+  useEffect(() => {
+    fetchAnalytics().catch((error) => {
+      console.error('Failed to fetch analytics', error)
+    })
+  }, [fetchAnalytics])
 
   // Custom tooltips for dark theme
   const CustomTooltip = ({ active, payload, label }) => {
@@ -37,23 +44,23 @@ const Analytics = () => {
       <div className="stats-grid mb-xl">
         <motion.div className="stat-card glass-panel" initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{delay: 0.1}}>
            <p className="text-mono text-dim mb-2 text-xs">AVERAGE AI CONFIDENCE</p>
-           <h3 className="heading-display text-accent text-3xl">92.4%</h3>
-           <p className="text-signal-green text-xs mt-2">↑ 2.1% from last month</p>
+           <h3 className="heading-display text-accent text-3xl">{analyticsSummary?.avg_ai_confidence || 0}%</h3>
+           <p className="text-signal-green text-xs mt-2">Live from backend</p>
         </motion.div>
         <motion.div className="stat-card glass-panel" initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{delay: 0.2}}>
            <p className="text-mono text-dim mb-2 text-xs">AVG SLA RESOLUTION TIME</p>
-           <h3 className="heading-display text-3xl">3.8 <span className="text-lg text-dim">Days</span></h3>
-           <p className="text-signal-green text-xs mt-2">↓ 0.4 days improvement</p>
+           <h3 className="heading-display text-3xl">{districts.length} <span className="text-lg text-dim">Districts</span></h3>
+           <p className="text-signal-green text-xs mt-2">Live district coverage</p>
         </motion.div>
         <motion.div className="stat-card glass-panel" initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{delay: 0.3}}>
            <p className="text-mono text-dim mb-2 text-xs">AUTO-ROUTING EFFICIENCY</p>
-           <h3 className="heading-display text-3xl">98.1%</h3>
-           <p className="text-secondary text-xs mt-2">Zero human intervention required</p>
+           <h3 className="heading-display text-3xl">{analyticsSummary?.resolved || 0}/{analyticsSummary?.total || 0}</h3>
+           <p className="text-secondary text-xs mt-2">Resolved vs total reports</p>
         </motion.div>
         <motion.div className="stat-card glass-panel" initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{delay: 0.4}}>
            <p className="text-mono text-dim mb-2 text-xs">CRITICAL INCIDENTS</p>
-           <h3 className="heading-display text-signal-red text-3xl">14</h3>
-           <p className="text-signal-red text-xs mt-2">Requires immediate attention</p>
+           <h3 className="heading-display text-signal-red text-3xl">{analyticsSummary?.critical || 0}</h3>
+           <p className="text-signal-red text-xs mt-2">Critical incidents from DB</p>
         </motion.div>
       </div>
 

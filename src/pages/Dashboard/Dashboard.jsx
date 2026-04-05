@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { MapPin } from 'lucide-react'
@@ -7,10 +8,16 @@ import { StatusBadge, SeverityBadge } from '../../components/StatusBadge/StatusB
 import './Dashboard.css'
 
 const Dashboard = () => {
-  const { user, reports } = useStore()
+  const { user, reports, fetchReports } = useStore()
+
+  useEffect(() => {
+    fetchReports().catch((error) => {
+      console.error('Failed to fetch dashboard reports', error)
+    })
+  }, [fetchReports])
   
   // Filter reports for current citizen
-  const citizenReports = reports.filter(r => r.reportedBy === user?.id || r.reportedBy === 'citizen_001') // Fallback to citizen_001 for demo if no user set
+  const citizenReports = reports.filter(r => r.reportedBy === user?.id)
 
   const activeReports = citizenReports.filter(r => r.status !== 'resolved')
   const resolvedReports = citizenReports.filter(r => r.status === 'resolved')
