@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ChevronLeft, MapPin, Clock, Calendar, CheckCircle2, User, AlertCircle } from 'lucide-react'
@@ -9,9 +10,19 @@ import './ReportTracker.css'
 const ReportTracker = () => {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { reports } = useStore()
+  const { reports, fetchReports, reportsLoading } = useStore()
+
+  useEffect(() => {
+    fetchReports().catch((error) => {
+      console.error('Failed to fetch reports for tracker', error)
+    })
+  }, [fetchReports])
   
-  const report = reports.find(r => r.id === id) || reports[0] // Fallback for mock demo
+  const report = reports.find(r => r.id === id)
+
+  if (reportsLoading && !report) {
+    return <div className="p-xl text-center">Loading report...</div>
+  }
 
   if (!report) {
     return <div className="p-xl text-center">Report not found</div>

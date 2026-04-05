@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Camera, MapPin, CheckCircle2, ChevronRight, AlertTriangle, CloudRain, Construction, MapPinOff, ScanSearch } from 'lucide-react'
@@ -9,11 +9,23 @@ import './Report.css'
 
 const Report = () => {
   const navigate = useNavigate()
-  const { addReport } = useStore()
+  const { createReport, uploadReportMedia } = useStore()
   const [step, setStep] = useState(1) // 1: Camera Focus, 2: Details Focus, 3: Success
   const [image, setImage] = useState(null)
+  const [imageFile, setImageFile] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
   const [aiData, setAiData] = useState(null)
+  const [createdReportId, setCreatedReportId] = useState('')
+  const [submitError, setSubmitError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [locationLoading, setLocationLoading] = useState(false)
+  const [locationError, setLocationError] = useState('')
+  const [cameraError, setCameraError] = useState('')
+  const [cameraReady, setCameraReady] = useState(false)
+  const cameraInputRef = useRef(null)
+  const galleryInputRef = useRef(null)
+  const videoRef = useRef(null)
+  const cameraStreamRef = useRef(null)
   
   const [formData, setFormData] = useState({
     title: 'Reported Issue',
@@ -23,10 +35,96 @@ const Report = () => {
   })
   
   const [location, setLocation] = useState({
-    lat: 12.9716,
-    lng: 77.5946,
-    address: 'Detecting precise location...',
+    lat: null,
+    lng: null,
+    address: '',
   })
+
+  const locationReady = Number.isFinite(location.lat) && Number.isFinite(location.lng) && Boolean(location.address)
+
+  const stopCameraStream = () => {
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track) => track.stop())
+      cameraStreamRef.current = null
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+
+    setCameraReady(false)
+  }
+
+  const startCameraStream = async () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('Camera access is not supported in this browser.')
+      return
+    }
+
+    try {
+      setCameraError('')
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      })
+
+      cameraStreamRef.current = stream
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+      }
+      setCameraReady(true)
+    } catch (error) {
+      setCameraError(error.message || 'Unable to access camera. Use upload as fallback.')
+      setCameraReady(false)
+    }
+  }
+
+  const reverseGeocode = async (lat, lng) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`,
+      )
+
+      if (!response.ok) {
+        throw new Error('Reverse geocoding failed')
+      }
+
+      const data = await response.json()
+      return data.display_name || `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    } catch {
+      return `${lat.toFixed(5)}, ${lng.toFixed(5)}`
+    }
+  }
+
+  const fetchCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError('Geolocation is not supported in this browser.')
+      return
+    }
+
+    setLocationLoading(true)
+    setLocationError('')
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = Number(position.coords.latitude)
+        const lng = Number(position.coords.longitude)
+        const address = await reverseGeocode(lat, lng)
+
+        setLocation({ lat, lng, address })
+        setLocationLoading(false)
+      },
+      (error) => {
+        setLocationLoading(false)
+        setLocationError(error.message || 'Could not detect location.')
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 12000,
+        maximumAge: 0,
+      },
+    )
+  }
 
   // Simulated AI constraints
   useEffect(() => {
@@ -50,53 +148,139 @@ const Report = () => {
     }
   }, [image, formData.category, step])
   
-  // Simulated Location Fetch
   useEffect(() => {
-    setTimeout(() => {
-      setLocation({
-        lat: 12.9352,
-        lng: 77.6245,
-        address: 'Sector 4, Outer Ring Road, Bengaluru'
-      })
-    }, 1200)
+    fetchCurrentLocation()
   }, [])
+
+  useEffect(() => {
+    if (step === 1) {
+      startCameraStream()
+      return () => {
+        stopCameraStream()
+      }
+    }
+
+    stopCameraStream()
+    return undefined
+  }, [step])
+
+  useEffect(() => {
+    return () => {
+      if (image) {
+        URL.revokeObjectURL(image)
+      }
+      stopCameraStream()
+    }
+  }, [image])
 
   const handleImageUpload = (e) => {
     const file = e.target.files[0]
     if (file) {
-      const url = URL.createObjectURL(file)
-      setImage(url)
+      try {
+        if (image) {
+          URL.revokeObjectURL(image)
+        }
+
+        const previewUrl = URL.createObjectURL(file)
+        setImage(previewUrl)
+        setImageFile(file)
+      } catch {
+        setSubmitError('Could not process selected image')
+        return
+      }
       setStep(2) // Jump straight to details
     }
+
+    e.target.value = ''
   }
+
+  const captureFromLiveCamera = async () => {
+    if (!videoRef.current) return
+
+    const video = videoRef.current
+    const width = video.videoWidth || 1280
+    const height = video.videoHeight || 720
+
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+
+    const context = canvas.getContext('2d')
+    if (!context) {
+      setSubmitError('Could not capture image from camera')
+      return
+    }
+
+    context.drawImage(video, 0, 0, width, height)
+
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+    if (!blob) {
+      setSubmitError('Could not capture image from camera')
+      return
+    }
+
+    if (image) {
+      URL.revokeObjectURL(image)
+    }
+
+    const file = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' })
+    const previewUrl = URL.createObjectURL(file)
+
+    setImage(previewUrl)
+    setImageFile(file)
+    setStep(2)
+  }
+
+  const handleCameraClick = () => {
+    if (cameraReady) {
+      captureFromLiveCamera()
+      return
+    }
+
+    cameraInputRef.current?.click()
+  }
+
+  const handleGalleryClick = () => galleryInputRef.current?.click()
 
   const handleCategorySelect = (cat) => {
     setFormData(prev => ({ ...prev, category: cat }))
   }
 
-  const handleSubmit = () => {
-    const id = `RW-${Math.floor(1000 + Math.random() * 9000)}`
-    addReport({
-      id,
-      title: formData.title,
-      description: formData.description,
-      category: formData.category || 'hazard',
-      severity: formData.severity,
-      status: 'pending',
-      location: location,
-      district: 'Bangalore East', 
-      reportedBy: 'citizen_current',
-      reporterName: 'Current User',
-      assignedTo: null,
-      aiConfidence: aiData?.confidence || 0,
-      images: [image],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      slaDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      resolution: null,
-    })
-    
-    setStep(3)
+  const handleSubmit = async () => {
+    setSubmitError('')
+
+    if (!locationReady) {
+      setSubmitError('Location is required. Please enable location access and try again.')
+      return
+    }
+
+    if (!imageFile) {
+      setSubmitError('Please capture or upload a photo before submitting.')
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      const uploadedImageUrl = await uploadReportMedia(imageFile)
+
+      const report = await createReport({
+        title: formData.title,
+        description: formData.description || 'Citizen submitted report',
+        category: formData.category || 'hazard',
+        severity: formData.severity,
+        location,
+        images: uploadedImageUrl ? [uploadedImageUrl] : [],
+        aiConfidence: aiData?.confidence || 80,
+      })
+
+      setCreatedReportId(report.id)
+      setStep(3)
+    } catch (error) {
+      setSubmitError(error.message || 'Failed to submit report')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -119,6 +303,7 @@ const Report = () => {
              </div>
 
              <div className="camera-viewfinder">
+               <video ref={videoRef} className="camera-live-feed" autoPlay playsInline muted />
                 <div className="viewfinder-frame">
                    <div className="bracket tl"></div><div className="bracket tr"></div>
                    <div className="bracket bl"></div><div className="bracket br"></div>
@@ -135,17 +320,38 @@ const Report = () => {
                 </div>
 
                 <div className="camera-controls-safe-area z-10">
-                  <button 
-                     onClick={() => {
-                       setImage('https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&q=80')
-                       setStep(2)
-                     }} 
-                     className="capture-btn"
-                     aria-label="Capture Issue"
-                  >
-                     <div className="capture-inner"></div>
+                  <button onClick={handleCameraClick} className="capture-btn" aria-label="Capture from camera">
+                    <div className="capture-inner"></div>
                   </button>
-                  <p className="text-xs font-mono text-center mt-6 tracking-widest text-white/70">TAP TO CAPTURE</p>
+                  <p className="text-xs font-mono text-center mt-6 tracking-widest text-white/70">
+                    {cameraReady ? 'TAP TO CAPTURE PHOTO' : 'OPEN CAMERA OR UPLOAD'}
+                  </p>
+                  {cameraError ? <p className="camera-warning">{cameraError}</p> : null}
+
+                  <div className="camera-actions">
+                    <button type="button" className="capture-option-btn" onClick={handleCameraClick}>
+                      {cameraReady ? 'Capture Now' : 'Use Camera'}
+                    </button>
+                    <button type="button" className="capture-option-btn" onClick={handleGalleryClick}>
+                      Upload Photo
+                    </button>
+                  </div>
+
+                  <input
+                    ref={cameraInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleImageUpload}
+                    style={{ display: 'none' }}
+                  />
+                  <input
+                    ref={galleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    style={{ display: 'none' }}
+                  />
                 </div>
              </div>
           </motion.div>
@@ -201,12 +407,25 @@ const Report = () => {
                         <MapPin className="text-signal-cyan" size={16} />
                         <span className="text-xs text-dim font-mono tracking-wide">AUTO-DETECTED GEO</span>
                       </div>
-                      <p className="text-base font-semibold text-primary leading-tight w-2/3">{location.address}</p>
-                      <p className="text-xs text-secondary font-mono mt-3">LAT: {location.lat} // LNG: {location.lng}</p>
+                      <p className="text-base font-semibold text-primary leading-tight w-2/3">
+                        {locationLoading ? 'Detecting location...' : location.address || 'Location not available'}
+                      </p>
+                      <p className="text-xs text-secondary font-mono mt-3">
+                        LAT: {location.lat ?? 'NA'} // LNG: {location.lng ?? 'NA'}
+                      </p>
+                      {locationError ? <p className="location-warning">{locationError}</p> : null}
+                      <button type="button" className="capture-option-btn location-actions" onClick={fetchCurrentLocation}>
+                        Refresh Location
+                      </button>
                     </div>
                     {/* Rendered Map Background Style */}
                     <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-30 select-none pointer-events-none fade-left">
-                       <MapView center={[location.lat, location.lng]} zoom={14} interactive={false} reports={[{id:'1', location, severity:'medium'}]} />
+                       <MapView
+                         center={[location.lat || 12.9716, location.lng || 77.5946]}
+                         zoom={14}
+                         interactive={false}
+                         reports={[{ id: '1', location: { ...location, lat: location.lat || 12.9716, lng: location.lng || 77.5946 }, severity: 'medium' }]}
+                       />
                     </div>
                  </div>
 
@@ -280,13 +499,14 @@ const Report = () => {
 
                  <button 
                     onClick={handleSubmit}
-                    disabled={!formData.category || analyzing}
+                    disabled={!formData.category || analyzing || !locationReady || submitting}
                     className={`btn btn-primary btn-lg w-full flex items-center justify-center gap-2 py-4 shadow-lg ${
-                      (analyzing || !formData.category) ? 'opacity-50 pointer-events-none grayscale' : 'hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]'
+                      (analyzing || !formData.category || !locationReady || submitting) ? 'opacity-50 pointer-events-none grayscale' : 'hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]'
                     }`}
                  >
-                    {analyzing ? 'System Analyzing...' : 'Deploy Report Protocol'} <ChevronRight size={18} />
+                    {analyzing ? 'System Analyzing...' : submitting ? 'Uploading Media...' : 'Deploy Report Protocol'} <ChevronRight size={18} />
                  </button>
+                    {submitError ? <p className="text-dim" style={{ color: '#ff6b6b' }}>{submitError}</p> : null}
                </div>
              </div>
           </motion.div>
@@ -308,7 +528,7 @@ const Report = () => {
              
              <div className="bg-surface border border-subtle px-6 py-4 rounded-xl mb-10 w-full max-w-sm flex items-center justify-between">
                 <span className="text-dim text-sm font-medium">Tracking ID</span>
-                <span className="font-mono text-amber font-semibold tracking-wider">RW-2841</span>
+               <span className="font-mono text-amber font-semibold tracking-wider">{createdReportId || 'N/A'}</span>
              </div>
 
              <div className="flex flex-col w-full max-w-sm gap-3">

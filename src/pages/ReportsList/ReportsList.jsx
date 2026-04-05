@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, Filter, Calendar, MapPin, X,
@@ -9,7 +9,13 @@ import { StatusBadge, SeverityBadge, AiConfidenceBadge } from '../../components/
 import './ReportsList.css'
 
 const ReportsList = () => {
-  const { reports, updateReportStatus, user } = useStore()
+  const { reports, updateReportStatus, fetchReports, user } = useStore()
+
+  useEffect(() => {
+    fetchReports().catch((error) => {
+      console.error('Failed to fetch reports list', error)
+    })
+  }, [fetchReports])
   
   const adminReports = user?.role === 'super_admin' 
     ? reports 
@@ -119,18 +125,26 @@ const ReportsList = () => {
     }
   }
 
-  const handleBulkExecute = () => {
+  const handleBulkExecute = async () => {
     if (!bulkAction || selectedIds.length === 0) return
-    selectedIds.forEach(id => updateReportStatus(id, bulkAction))
-    alert(`Successfully applied bulk action [${bulkAction.toUpperCase()}] to ${selectedIds.length} reports.`)
+    try {
+      await Promise.all(selectedIds.map(id => updateReportStatus(id, bulkAction)))
+      alert(`Successfully applied bulk action [${bulkAction.toUpperCase()}] to ${selectedIds.length} reports.`)
+    } catch (error) {
+      alert(error.message || 'Bulk update failed')
+    }
     setSelectedIds([])
     setBulkAction('')
   }
   
-  const handlePanelAction = (status) => {
+  const handlePanelAction = async (status) => {
     if (selectedReport) {
-      updateReportStatus(selectedReport.id, status)
-      setSelectedReport({...selectedReport, status})
+      try {
+        const updated = await updateReportStatus(selectedReport.id, status)
+        setSelectedReport(updated)
+      } catch (error) {
+        alert(error.message || 'Failed to update report')
+      }
       setAssigningMode(false)
     }
   }

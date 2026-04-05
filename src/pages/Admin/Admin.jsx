@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ChevronLeft, Search, Filter, Clock, MapPin as MapPinIcon, 
@@ -14,6 +14,7 @@ const Admin = () => {
     reports, 
     user, 
     updateReportStatus, 
+    fetchReports,
     filterStatus, setFilterStatus, 
     filterSeverity, setFilterSeverity 
   } = useStore()
@@ -22,6 +23,12 @@ const Admin = () => {
   const [assigningId, setAssigningId] = useState(null) // ID of report being assigned
   const [searchQuery, setSearchQuery] = useState('')
   const [bulkMode, setBulkMode] = useState(false)
+
+  useEffect(() => {
+    fetchReports().catch((error) => {
+      console.error('Failed to fetch reports for admin', error)
+    })
+  }, [fetchReports])
   
   // District admins see their district, super admins see all
   const adminReports = user?.role === 'super_admin' 
@@ -39,11 +46,14 @@ const Admin = () => {
   const pendingCount = adminReports.filter(r => r.status === 'pending').length
   const criticalCount = adminReports.filter(r => r.severity === 'critical' && r.status !== 'resolved').length
 
-  const handleAction = (status, note = '') => {
+  const handleAction = async (status, note = '') => {
     if (selectedReport) {
-      updateReportStatus(selectedReport.id, status)
-      // Mock update local state for immediate feedback
-      setSelectedReport({...selectedReport, status})
+      try {
+        const updated = await updateReportStatus(selectedReport.id, status, note)
+        setSelectedReport(updated)
+      } catch (error) {
+        alert(error.message || 'Failed to update report status')
+      }
       if (status === 'assigned') setAssigningId(null)
     }
   }

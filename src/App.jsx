@@ -7,6 +7,7 @@ import Report from './pages/Report/Report'
 import ReportTracker from './pages/Report/ReportTracker'
 import Dashboard from './pages/Dashboard/Dashboard'
 import Admin from './pages/Admin/Admin'
+import SuperAdmin from './pages/SuperAdmin/SuperAdmin'
 import ReportsList from './pages/ReportsList/ReportsList'
 import Analytics from './pages/Analytics/Analytics'
 import useStore from './store/useStore'
@@ -27,12 +28,24 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 }
 
 function App() {
-  const { fetchCurrentUser, token } = useStore()
+  const { fetchCurrentUser, fetchReports, fetchAnalytics, token } = useStore()
 
   useEffect(() => {
     if (!token) return
-    fetchCurrentUser()
-  }, [token, fetchCurrentUser])
+
+    const bootstrap = async () => {
+      const currentUser = await fetchCurrentUser()
+      await fetchReports()
+
+      if (['district_admin', 'super_admin'].includes(currentUser?.role)) {
+        await fetchAnalytics()
+      }
+    }
+
+    bootstrap().catch((error) => {
+      console.error('Failed to bootstrap app data', error)
+    })
+  }, [token, fetchCurrentUser, fetchReports, fetchAnalytics])
 
   return (
     <div className="app">
@@ -43,7 +56,14 @@ function App() {
           <Route path="/login" element={<Login />} />
           
           {/* Citizen Routes */}
-          <Route path="/report" element={<Report />} />
+          <Route
+            path="/report"
+            element={
+              <ProtectedRoute allowedRoles={['citizen']}>
+                <Report />
+              </ProtectedRoute>
+            }
+          />
           <Route 
             path="/report/:id" 
             element={
@@ -74,7 +94,7 @@ function App() {
             path="/admin/super" 
             element={
               <ProtectedRoute allowedRoles={['super_admin']}>
-                <Admin />
+                <SuperAdmin />
               </ProtectedRoute>
             } 
           />
