@@ -22,9 +22,33 @@ CREATE TABLE IF NOT EXISTS profiles (
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
 CREATE INDEX IF NOT EXISTS idx_profiles_district ON profiles(district);
 
--- Seed one super admin manually
--- 1) Replace hash with bcrypt hash for your real password.
--- 2) Run this block once.
+CREATE TABLE IF NOT EXISTS reports (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('pothole', 'crack', 'hazard', 'waterlogging', 'erosion', 'signage', 'other')),
+  severity TEXT NOT NULL CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'verified', 'assigned', 'resolved', 'rejected')) DEFAULT 'pending',
+  district TEXT NOT NULL,
+  location_lat DOUBLE PRECISION NOT NULL,
+  location_lng DOUBLE PRECISION NOT NULL,
+  location_address TEXT NOT NULL,
+  reported_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  assigned_to UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  ai_confidence INTEGER NOT NULL DEFAULT 85 CHECK (ai_confidence BETWEEN 0 AND 100),
+  images TEXT[] NOT NULL DEFAULT '{}',
+  resolution TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  sla_deadline TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '72 hours'
+);
+
+CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status);
+CREATE INDEX IF NOT EXISTS idx_reports_severity ON reports(severity);
+CREATE INDEX IF NOT EXISTS idx_reports_district ON reports(district);
+CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at);
+
+-- Optional static seed block (runtime seeder also ensures super admin).
 INSERT INTO auth_users (id, email, password_hash)
 VALUES (
   '11111111-1111-1111-1111-111111111111',
