@@ -21,6 +21,7 @@ const issueToken = (user) => jwt.sign(
     sub: user.id,
     email: user.email,
     role: user.role,
+    district: user.district,
   },
   env.jwtSecret,
   { expiresIn: env.jwtExpiresIn },
