@@ -33,12 +33,12 @@ const Header = () => {
   }
 
   const navLinks = isAuthenticated ? (
-    userRole === 'superadmin' ? [
-      { path: '/admin', label: 'Command Center' },
+    userRole === 'super_admin' ? [
+      { path: '/admin/super', label: 'Command Center' },
       { path: '/reports', label: 'All Reports' },
       { path: '/analytics', label: 'Analytics' },
-    ] : userRole === 'admin' ? [
-      { path: '/admin', label: 'Command Center' },
+    ] : userRole === 'district_admin' ? [
+      { path: '/admin/district', label: 'Command Center' },
       { path: '/reports', label: 'All Reports' },
       { path: '/analytics', label: 'Analytics' },
     ] : [
@@ -97,7 +97,7 @@ const Header = () => {
 
                 <AnimatePresence>
                   {notifOpen && (() => {
-                    const isAdmin = ['admin', 'superadmin'].includes(userRole)
+                    const isAdmin = ['district_admin', 'super_admin'].includes(userRole)
                     
                     const adminNotifs = [
                       { id: 901, type: 'alert', message: '[CRITICAL ALERT] Severe road hazard detected in Sector 4. Immediate dispatch required.', time: '2m ago', read: false },
@@ -157,7 +157,7 @@ const Header = () => {
                   onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false) }}
                   id="profile-menu"
                 >
-                  {['admin', 'superadmin'].includes(userRole) ? (
+                  {['district_admin', 'super_admin'].includes(userRole) ? (
                     <div className="admin-avatar-hex-sm" style={{ width: '24px', height: '24px', borderRadius: '4px' }}>
                       <span className="hex-inner-sm" style={{ fontSize: '0.7rem' }}>{user?.name?.charAt(0)}</span>
                     </div>
@@ -181,11 +181,11 @@ const Header = () => {
                       exit={{ opacity: 0, y: -10, scale: 0.95 }}
                       transition={{ duration: 0.2 }}
                       style={{ 
-                        width: ['admin', 'superadmin'].includes(userRole) ? '320px' : '220px', 
-                        padding: ['admin', 'superadmin'].includes(userRole) ? '16px' : '12px' 
+                        width: ['district_admin', 'super_admin'].includes(userRole) ? '320px' : '220px', 
+                        padding: ['district_admin', 'super_admin'].includes(userRole) ? '16px' : '12px' 
                       }}
                     >
-                      {['admin', 'superadmin'].includes(userRole) ? (
+                      {['district_admin', 'super_admin'].includes(userRole) ? (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexShrink: 0, paddingBottom: '12px' }}>
                           <div className="admin-avatar-hex-sm" style={{ width: '42px', height: '42px', borderRadius: '8px', background: 'var(--bg-primary)' }}>
                             <span className="hex-inner-sm" style={{ fontSize: '1.2rem', color: 'var(--signal-cyan)' }}>{user?.name?.charAt(0) || 'A'}</span>

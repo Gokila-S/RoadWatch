@@ -23,8 +23,8 @@ const Admin = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [bulkMode, setBulkMode] = useState(false)
   
-  // Admin sees reports based on their district, SuperAdmin sees all
-  const adminReports = user?.role === 'superadmin' 
+  // District admins see their district, super admins see all
+  const adminReports = user?.role === 'super_admin' 
     ? reports 
     : reports.filter(r => r.district === user?.district)
 
@@ -68,7 +68,7 @@ const Admin = () => {
 
           <MapView 
             reports={filteredReports} 
-            center={user?.role === 'superadmin' ? [12.9716, 77.5946] : [13.0358, 77.5970]} 
+            center={user?.role === 'super_admin' ? [12.9716, 77.5946] : [13.0358, 77.5970]} 
             zoom={12}
             colorBy="status"
             onMarkerClick={(report) => setSelectedReport(report)}

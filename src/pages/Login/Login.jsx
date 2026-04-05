@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import useStore from '../../store/useStore'
@@ -6,42 +6,66 @@ import './Login.css'
 
 const Login = () => {
   const navigate = useNavigate()
-  const { login } = useStore()
-  const [role, setRole] = useState('citizen')
-  const [phoneNumber, setPhoneNumber] = useState('')
-  const [otpSent, setOtpSent] = useState(false)
-  const [otp, setOtp] = useState('')
-  const [adminPin, setAdminPin] = useState('')
+  const { login, signupCitizen, isAuthenticated, userRole, authLoading } = useStore()
 
-  const [name, setName] = useState('')
+  const [mode, setMode] = useState('login')
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
 
-  const handleSendOtp = (e) => {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+
+  const [fullName, setFullName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [district, setDistrict] = useState('')
+  const [signupEmail, setSignupEmail] = useState('')
+  const [signupPassword, setSignupPassword] = useState('')
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+
+    if (userRole === 'citizen') navigate('/dashboard')
+    if (userRole === 'district_admin') navigate('/admin/district')
+    if (userRole === 'super_admin') navigate('/admin/super')
+  }, [isAuthenticated, userRole, navigate])
+
+  const handleLogin = async (e) => {
     e.preventDefault()
-    if (phoneNumber.length === 10 && name.trim().length > 0) {
-      setOtpSent(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const result = await login(email, password)
+      navigate(result.route)
+    } catch (err) {
+      setError(err.message || 'Unable to login')
     }
   }
 
-  const handleVerifyOtp = (e) => {
+  const handleCitizenSignup = async (e) => {
     e.preventDefault()
-    if (otp === '1234') { 
-      login('citizen', name)
-      navigate('/dashboard')
-    } else {
-      alert('Invalid OTP. Use 1234')
-    }
-  }
+    setError('')
+    setSuccess('')
 
-  const handleAdminLogin = (e) => {
-    e.preventDefault()
-    if (adminPin === 'admin') {
-      login('admin')
-      navigate('/admin')
-    } else if (adminPin === 'super') {
-      login('superadmin')
-      navigate('/admin')
-    } else {
-      alert('Invalid pin. Use "admin" or "super"')
+    try {
+      await signupCitizen({
+        full_name: fullName,
+        email: signupEmail,
+        password: signupPassword,
+        phone,
+        district,
+      })
+
+      setSuccess('Citizen account created. You can now sign in with email and password.')
+      setMode('login')
+      setEmail(signupEmail)
+      setPassword('')
+      setFullName('')
+      setPhone('')
+      setDistrict('')
+      setSignupPassword('')
+    } catch (err) {
+      setError(err.message || 'Unable to create account')
     }
   }
 
@@ -56,108 +80,129 @@ const Login = () => {
         >
           <div className="login-header">
             <h2 className="heading-display heading-md">System Access</h2>
-            <p className="text-secondary">Authenticate to access RoadWatch platform</p>
+            <p className="text-secondary">Single login with email and password</p>
           </div>
 
-          <div className="role-selector">
+          <div className="role-selector" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <button
-              className={`role-btn ${role === 'citizen' ? 'role-active' : ''}`}
-              onClick={() => setRole('citizen')}
+              className={`role-btn ${mode === 'login' ? 'role-active' : ''}`}
+              onClick={() => { setMode('login'); setError(''); setSuccess('') }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
+                <path d="M3 12h18" />
+                <path d="M12 3v18" />
               </svg>
-              Citizen
+              Sign In
             </button>
             <button
-              className={`role-btn ${role === 'admin' ? 'role-active' : ''}`}
-              onClick={() => { setRole('admin'); setOtpSent(false) }}
+              className={`role-btn ${mode === 'signup' ? 'role-active' : ''}`}
+              onClick={() => { setMode('signup'); setError(''); setSuccess('') }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="8.5" cy="7" r="4" />
+                <path d="M20 8v6" />
+                <path d="M23 11h-6" />
               </svg>
-              Personnel
+              Citizen Signup
             </button>
           </div>
+
+          {error ? <p className="text-dim" style={{ color: '#ff6b6b', marginTop: '12px' }}>{error}</p> : null}
+          {success ? <p className="text-dim" style={{ color: '#65d6a6', marginTop: '12px' }}>{success}</p> : null}
 
           <div className="login-body">
-            {role === 'citizen' ? (
-              !otpSent ? (
-                <form onSubmit={handleSendOtp} className="login-form">
-                  <div className="input-group mb-4">
-                    <label className="input-label">Full Name</label>
-                    <input
-                      type="text"
-                      className="input-field"
-                      placeholder="e.g. Priya Sharma"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label className="input-label">Mobile Number</label>
-                    <div className="phone-input">
-                      <span className="phone-prefix">+91</span>
-                      <input
-                        type="tel"
-                        className="input-field"
-                        placeholder="10-digit mobile number"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                        autoFocus
-                      />
-                    </div>
-                  </div>
-                  <button type="submit" className="btn btn-primary btn-lg w-full mt-4" disabled={phoneNumber.length !== 10 || name.trim().length === 0}>
-                    Request Security OTP
-                  </button>
-                  <p className="text-dim text-mono login-hint">Use any 10-digit number</p>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOtp} className="login-form">
-                  <div className="input-group">
-                    <label className="input-label">One-Time Password</label>
-                    <input
-                      type="text"
-                      className="input-field otp-input"
-                      placeholder="• • • •"
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                      autoFocus
-                    />
-                  </div>
-                  <button type="submit" className="btn btn-primary btn-lg w-full mt-4" disabled={otp.length !== 4}>
-                    Verify & Authenticate
-                  </button>
-                  <button type="button" className="btn btn-ghost w-full mt-2" onClick={() => setOtpSent(false)}>
-                    <span className="text-mono">← Back to mobile entry</span>
-                  </button>
-                  <p className="text-dim text-mono login-hint">Demo OTP: 1234</p>
-                </form>
-              )
-            ) : (
-              <form onSubmit={handleAdminLogin} className="login-form">
+            {mode === 'login' ? (
+              <form onSubmit={handleLogin} className="login-form">
                 <div className="input-group">
-                  <label className="input-label">Access PIN</label>
+                  <label className="input-label">Email</label>
                   <input
-                    type="password"
+                    type="email"
                     className="input-field"
-                    placeholder="Enter security pin"
-                    value={adminPin}
-                    onChange={(e) => setAdminPin(e.target.value)}
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
                     autoFocus
                   />
                 </div>
-                <button type="submit" className="btn btn-primary btn-lg w-full mt-4" disabled={adminPin.length === 0}>
-                  Authenticate Admin
-                </button>
-                <div className="admin-hints mt-4 text-center">
-                  <p className="text-dim text-mono">District Admin: use <strong className="text-primary">"admin"</strong></p>
-                  <p className="text-dim text-mono">Super Admin: use <strong className="text-primary">"super"</strong></p>
+                <div className="input-group">
+                  <label className="input-label">Password</label>
+                  <input
+                    type="password"
+                    className="input-field"
+                    placeholder="Enter your password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                  />
                 </div>
+                <button type="submit" className="btn btn-primary btn-lg w-full mt-4" disabled={authLoading || !email || !password}>
+                  {authLoading ? 'Signing in...' : 'Sign In'}
+                </button>
+                <p className="text-dim text-mono login-hint">Role is resolved from your account profile after login.</p>
+              </form>
+            ) : (
+              <form onSubmit={handleCitizenSignup} className="login-form">
+                <div className="input-group">
+                  <label className="input-label">Full Name</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. Priya Sharma"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Email</label>
+                  <input
+                    type="email"
+                    className="input-field"
+                    placeholder="citizen@example.com"
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Password</label>
+                  <input
+                    type="password"
+                    className="input-field"
+                    placeholder="Create a password"
+                    value={signupPassword}
+                    onChange={(e) => setSignupPassword(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">Phone</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="+91-9xxxxxxxxx"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="input-group">
+                  <label className="input-label">District</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="e.g. Chennai Region"
+                    value={district}
+                    onChange={(e) => setDistrict(e.target.value)}
+                    required
+                  />
+                </div>
+                <button type="submit" className="btn btn-primary btn-lg w-full mt-4" disabled={authLoading}>
+                  Create Citizen Account
+                </button>
+                <p className="text-dim text-mono login-hint">District admins are created only by super admin from backend.</p>
               </form>
             )}
           </div>

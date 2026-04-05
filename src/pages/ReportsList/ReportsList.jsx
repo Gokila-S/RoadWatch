@@ -11,7 +11,7 @@ import './ReportsList.css'
 const ReportsList = () => {
   const { reports, updateReportStatus, user } = useStore()
   
-  const adminReports = user?.role === 'superadmin' 
+  const adminReports = user?.role === 'super_admin' 
     ? reports 
     : reports.filter(r => r.district === user?.district)
 

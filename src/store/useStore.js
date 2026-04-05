@@ -248,24 +248,154 @@ const ISSUE_CATEGORIES = [
   { id: 'other', label: 'Other', icon: '📋', count: 89 },
 ]
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'
+
+const getPersistedAuth = () => {
+  const token = localStorage.getItem('rw_token')
+  const userRaw = localStorage.getItem('rw_user')
+
+  if (!token || !userRaw) {
+    return { token: null, user: null }
+  }
+
+  try {
+    const user = JSON.parse(userRaw)
+    return { token, user }
+  } catch {
+    localStorage.removeItem('rw_token')
+    localStorage.removeItem('rw_user')
+    return { token: null, user: null }
+  }
+}
+
+const persistedAuth = getPersistedAuth()
+
 // ── Store ──
 
 const useStore = create((set, get) => ({
   // Auth
-  user: null,
-  isAuthenticated: false,
-  userRole: null, // 'citizen', 'admin', 'superadmin'
+  user: persistedAuth.user,
+  token: persistedAuth.token,
+  isAuthenticated: Boolean(persistedAuth.token),
+  userRole: persistedAuth.user?.role || null,
+  authLoading: false,
+  authError: null,
 
-  login: (role, name = undefined) => {
-    const users = {
-      citizen: { id: 'citizen_001', name: name || 'Priya Sharma', email: 'priya@example.com', role: 'citizen', district: 'Chennai Region' },
-      admin: { id: 'admin_north', name: 'Rajesh Kumar', email: 'rajesh@roadwatch.gov', role: 'admin', district: 'Chennai Region' },
-      superadmin: { id: 'super_001', name: 'Commissioner Rao', email: 'commissioner@roadwatch.gov', role: 'superadmin', district: 'All' },
+  login: async (email, password) => {
+    set({ authLoading: true, authError: null })
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed')
+      }
+
+      const user = {
+        id: data.user.id,
+        name: data.user.full_name,
+        email: data.user.email,
+        role: data.user.role,
+        district: data.user.district,
+        phone: data.user.phone,
+        status: data.user.status,
+      }
+
+      localStorage.setItem('rw_token', data.token)
+      localStorage.setItem('rw_user', JSON.stringify(user))
+
+      set({
+        user,
+        token: data.token,
+        isAuthenticated: true,
+        userRole: data.user.role,
+        authLoading: false,
+        authError: null,
+      })
+
+      return { route: data.route }
+    } catch (error) {
+      set({ authLoading: false, authError: error.message })
+      throw error
     }
-    set({ user: users[role], isAuthenticated: true, userRole: role })
   },
 
-  logout: () => set({ user: null, isAuthenticated: false, userRole: null }),
+  signupCitizen: async (payload) => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/signup/citizen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Signup failed')
+    }
+
+    return data
+  },
+
+  fetchCurrentUser: async () => {
+    const token = get().token
+    if (!token) return null
+
+    const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    if (!response.ok) {
+      get().logout()
+      return null
+    }
+
+    const data = await response.json()
+    const user = {
+      id: data.user.id,
+      name: data.user.full_name,
+      email: data.user.email,
+      role: data.user.role,
+      district: data.user.district,
+      phone: data.user.phone,
+      status: data.user.status,
+    }
+
+    localStorage.setItem('rw_user', JSON.stringify(user))
+    set({ user, userRole: user.role, isAuthenticated: true })
+
+    return user
+  },
+
+  createDistrictAdmin: async (payload) => {
+    const token = get().token
+    const response = await fetch(`${API_BASE_URL}/api/admin/district-admins`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not create district admin')
+    }
+
+    return data
+  },
+
+  logout: () => {
+    localStorage.removeItem('rw_token')
+    localStorage.removeItem('rw_user')
+    set({ user: null, token: null, isAuthenticated: false, userRole: null, authError: null })
+  },
 
   // Reports
   reports: MOCK_REPORTS,

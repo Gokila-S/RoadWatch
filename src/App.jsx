@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Header from './components/Header/Header'
 import Landing from './pages/Landing/Landing'
@@ -26,6 +27,13 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 }
 
 function App() {
+  const { fetchCurrentUser, token } = useStore()
+
+  useEffect(() => {
+    if (!token) return
+    fetchCurrentUser()
+  }, [token, fetchCurrentUser])
+
   return (
     <div className="app">
       <Header />
@@ -55,9 +63,17 @@ function App() {
           
           {/* Admin Routes */}
           <Route 
-            path="/admin" 
+            path="/admin/district" 
             element={
-              <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+              <ProtectedRoute allowedRoles={['district_admin', 'super_admin']}>
+                <Admin />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/super" 
+            element={
+              <ProtectedRoute allowedRoles={['super_admin']}>
                 <Admin />
               </ProtectedRoute>
             } 
@@ -65,7 +81,7 @@ function App() {
           <Route 
             path="/reports" 
             element={
-              <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+              <ProtectedRoute allowedRoles={['district_admin', 'super_admin']}>
                 <ReportsList />
               </ProtectedRoute>
             } 
@@ -73,7 +89,7 @@ function App() {
           <Route 
             path="/analytics" 
             element={
-              <ProtectedRoute allowedRoles={['admin', 'superadmin']}>
+              <ProtectedRoute allowedRoles={['district_admin', 'super_admin']}>
                 <Analytics />
               </ProtectedRoute>
             } 
