@@ -1,107 +1,108 @@
 import bcrypt from 'bcryptjs'
 import { pool } from './db.js'
+import { resolveDistrictFromCoordinates, SUPPORTED_DISTRICTS } from '../utils/districtResolver.js'
 
 const districtAdminsSeed = [
-  { full_name: 'Rajesh Kumar', email: 'rajesh@roadwatch.gov', password: 'District@123', district: 'Chennai Region', phone: '+91-9000000001' },
-  { full_name: 'Sunita Devi', email: 'sunita@roadwatch.gov', password: 'District@123', district: 'Coimbatore Region', phone: '+91-9000000002' },
-  { full_name: 'Mohammed Salim', email: 'salim@roadwatch.gov', password: 'District@123', district: 'Madurai Region', phone: '+91-9000000003' },
-  { full_name: 'Preethi Rao', email: 'preethi@roadwatch.gov', password: 'District@123', district: 'Trichy Region', phone: '+91-9000000004' },
-  { full_name: 'Ganesh Hegde', email: 'ganesh@roadwatch.gov', password: 'District@123', district: 'Salem Region', phone: '+91-9000000005' },
+  { full_name: 'Rajesh Kumar', email: 'rajesh@roadwatch.gov', password: 'District@123', district: 'Coimbatore', phone: '+91-9000000001' },
+  { full_name: 'Sunita Devi', email: 'sunita@roadwatch.gov', password: 'District@123', district: 'Erode', phone: '+91-9000000002' },
+  { full_name: 'Mohammed Salim', email: 'salim@roadwatch.gov', password: 'District@123', district: 'Tiruppur', phone: '+91-9000000003' },
+  { full_name: 'Preethi Rao', email: 'preethi@roadwatch.gov', password: 'District@123', district: 'Salem', phone: '+91-9000000004' },
+  { full_name: 'Ganesh Hegde', email: 'ganesh@roadwatch.gov', password: 'District@123', district: 'Trichy', phone: '+91-9000000005' },
 ]
 
 const citizensSeed = [
-  { full_name: 'Priya Sharma', email: 'priya@example.com', password: 'Citizen@123', district: 'Chennai Region', phone: '+91-9100000001' },
-  { full_name: 'Arjun Menon', email: 'arjun@example.com', password: 'Citizen@123', district: 'Trichy Region', phone: '+91-9100000002' },
-  { full_name: 'Kavitha R', email: 'kavitha@example.com', password: 'Citizen@123', district: 'Trichy Region', phone: '+91-9100000003' },
-  { full_name: 'Rahul Dev', email: 'rahul@example.com', password: 'Citizen@123', district: 'Madurai Region', phone: '+91-9100000004' },
-  { full_name: 'Deepa Nair', email: 'deepa@example.com', password: 'Citizen@123', district: 'Madurai Region', phone: '+91-9100000005' },
-  { full_name: 'Vikram Singh', email: 'vikram@example.com', password: 'Citizen@123', district: 'Chennai Region', phone: '+91-9100000006' },
-  { full_name: 'Anand Rao', email: 'anand@example.com', password: 'Citizen@123', district: 'Coimbatore Region', phone: '+91-9100000007' },
-  { full_name: 'Lakshmi P', email: 'lakshmi@example.com', password: 'Citizen@123', district: 'Coimbatore Region', phone: '+91-9100000008' },
+  { full_name: 'Priya Sharma', email: 'priya@example.com', password: 'Citizen@123', district: 'Coimbatore', phone: '+91-9100000001' },
+  { full_name: 'Arjun Menon', email: 'arjun@example.com', password: 'Citizen@123', district: 'Trichy', phone: '+91-9100000002' },
+  { full_name: 'Kavitha R', email: 'kavitha@example.com', password: 'Citizen@123', district: 'Tiruppur', phone: '+91-9100000003' },
+  { full_name: 'Rahul Dev', email: 'rahul@example.com', password: 'Citizen@123', district: 'Erode', phone: '+91-9100000004' },
+  { full_name: 'Deepa Nair', email: 'deepa@example.com', password: 'Citizen@123', district: 'Tiruppur', phone: '+91-9100000005' },
+  { full_name: 'Vikram Singh', email: 'vikram@example.com', password: 'Citizen@123', district: 'Salem', phone: '+91-9100000006' },
+  { full_name: 'Anand Rao', email: 'anand@example.com', password: 'Citizen@123', district: 'Erode', phone: '+91-9100000007' },
+  { full_name: 'Lakshmi P', email: 'lakshmi@example.com', password: 'Citizen@123', district: 'Salem', phone: '+91-9100000008' },
 ]
 
 const reportsSeed = [
   {
     id: 'RW-2026-0001',
-    title: 'Major pothole on NH-48 near Hebbal Flyover',
-    description: 'Large pothole approximately 2ft wide causing traffic slowdown and vehicle damage risk.',
-    category: 'pothole', severity: 'critical', status: 'assigned', district: 'Chennai Region',
-    location_lat: 13.0358, location_lng: 77.5970, location_address: 'NH-48, Hebbal, Bangalore',
+    title: 'Major pothole near Gandhipuram Bus Stand',
+    description: 'Deep pothole creating wheel wobble risk during peak traffic hours.',
+    category: 'pothole', severity: 'critical', status: 'assigned', district: 'Coimbatore',
+    location_lat: 11.0151, location_lng: 76.9554, location_address: 'Gandhipuram, Coimbatore',
     reporter_email: 'priya@example.com', assigned_email: 'rajesh@roadwatch.gov', ai_confidence: 94,
   },
   {
     id: 'RW-2026-0002',
-    title: 'Road surface crack on MG Road',
-    description: 'Longitudinal crack spanning 15 meters on MG Road near Brigade Road junction.',
-    category: 'crack', severity: 'high', status: 'verified', district: 'Trichy Region',
-    location_lat: 12.9716, location_lng: 77.6070, location_address: 'MG Road, Bangalore',
-    reporter_email: 'arjun@example.com', assigned_email: 'preethi@roadwatch.gov', ai_confidence: 89,
+    title: 'Road surface crack on Cantonment stretch',
+    description: 'Long crack along lane edge near traffic merge area.',
+    category: 'crack', severity: 'high', status: 'verified', district: 'Trichy',
+    location_lat: 10.8062, location_lng: 78.6855, location_address: 'Cantonment, Trichy',
+    reporter_email: 'arjun@example.com', assigned_email: 'ganesh@roadwatch.gov', ai_confidence: 89,
   },
   {
     id: 'RW-2026-0003',
-    title: 'Damaged manhole cover on Residency Road',
-    description: 'Manhole cover broken and partially sunken, creating a hazard for two-wheelers.',
-    category: 'hazard', severity: 'critical', status: 'pending', district: 'Trichy Region',
-    location_lat: 12.9700, location_lng: 77.6000, location_address: 'Residency Road, Bangalore',
+    title: 'Damaged manhole cover near Old Bus Stand',
+    description: 'Manhole cover cracked and tilted, unsafe for two-wheelers.',
+    category: 'hazard', severity: 'critical', status: 'pending', district: 'Tiruppur',
+    location_lat: 11.1088, location_lng: 77.3412, location_address: 'Old Bus Stand Road, Tiruppur',
     reporter_email: 'kavitha@example.com', assigned_email: null, ai_confidence: 91,
   },
   {
     id: 'RW-2026-0004',
-    title: 'Water logging on Outer Ring Road',
-    description: 'Severe water logging due to broken drainage causing traffic congestion during rains.',
-    category: 'waterlogging', severity: 'high', status: 'assigned', district: 'Madurai Region',
-    location_lat: 12.9352, location_lng: 77.6245, location_address: 'Outer Ring Road, Marathahalli',
-    reporter_email: 'rahul@example.com', assigned_email: 'salim@roadwatch.gov', ai_confidence: 87,
+    title: 'Water logging near Perundurai Road junction',
+    description: 'Water accumulation blocks one lane after rain, causing long queues.',
+    category: 'waterlogging', severity: 'high', status: 'assigned', district: 'Erode',
+    location_lat: 11.3365, location_lng: 77.7272, location_address: 'Perundurai Road, Erode',
+    reporter_email: 'rahul@example.com', assigned_email: 'sunita@roadwatch.gov', ai_confidence: 87,
   },
   {
     id: 'RW-2026-0005',
-    title: 'Speed breaker damage on 100ft Road',
-    description: 'Speed breaker has deteriorated, chunks of concrete missing creating sharp edges.',
-    category: 'pothole', severity: 'medium', status: 'resolved', district: 'Madurai Region',
-    location_lat: 12.9560, location_lng: 77.6410, location_address: '100ft Road, Indiranagar',
+    title: 'Speed breaker damage near Avinashi Road',
+    description: 'Broken speed breaker edges causing loss of control at night.',
+    category: 'pothole', severity: 'medium', status: 'resolved', district: 'Tiruppur',
+    location_lat: 11.1342, location_lng: 77.3248, location_address: 'Avinashi Road, Tiruppur',
     reporter_email: 'deepa@example.com', assigned_email: 'salim@roadwatch.gov', ai_confidence: 96,
     resolution: 'Repaired with fresh concrete. Quality check passed.',
   },
   {
     id: 'RW-2026-0006',
-    title: 'Cave-in near Whitefield bus stop',
-    description: 'Road cave-in about 3ft deep near bus stop. Area barricaded by locals.',
-    category: 'hazard', severity: 'critical', status: 'assigned', district: 'Madurai Region',
-    location_lat: 12.9698, location_lng: 77.7500, location_address: 'Whitefield Main Road, Bangalore',
-    reporter_email: 'deepa@example.com', assigned_email: 'salim@roadwatch.gov', ai_confidence: 98,
+    title: 'Road cave-in near Five Roads signal',
+    description: 'Road cave-in around 2ft deep; temporary barricade placed by locals.',
+    category: 'hazard', severity: 'critical', status: 'assigned', district: 'Salem',
+    location_lat: 11.6731, location_lng: 78.1401, location_address: 'Five Roads Junction, Salem',
+    reporter_email: 'vikram@example.com', assigned_email: 'preethi@roadwatch.gov', ai_confidence: 98,
   },
   {
     id: 'RW-2026-0007',
-    title: 'Road shoulder erosion on Kanakapura Road',
-    description: 'Significant erosion on road shoulder making it dangerous for cyclists and pedestrians.',
-    category: 'erosion', severity: 'medium', status: 'verified', district: 'Coimbatore Region',
-    location_lat: 12.8890, location_lng: 77.5740, location_address: 'Kanakapura Road, JP Nagar',
-    reporter_email: 'anand@example.com', assigned_email: 'sunita@roadwatch.gov', ai_confidence: 82,
+    title: 'Road shoulder erosion near Ukkadam bypass',
+    description: 'Shoulder erosion increasing risk for two-wheelers and buses.',
+    category: 'erosion', severity: 'medium', status: 'verified', district: 'Coimbatore',
+    location_lat: 11.0015, location_lng: 76.9441, location_address: 'Ukkadam Bypass, Coimbatore',
+    reporter_email: 'priya@example.com', assigned_email: 'rajesh@roadwatch.gov', ai_confidence: 82,
   },
   {
     id: 'RW-2026-0008',
-    title: 'Multiple potholes on Bellary Road',
-    description: 'Series of potholes spanning 200m stretch near Palace Grounds entrance.',
-    category: 'pothole', severity: 'high', status: 'resolved', district: 'Chennai Region',
-    location_lat: 13.0070, location_lng: 77.5780, location_address: 'Bellary Road, Sadashivanagar',
-    reporter_email: 'vikram@example.com', assigned_email: 'rajesh@roadwatch.gov', ai_confidence: 93,
+    title: 'Multiple potholes near Srirangam approach road',
+    description: 'Potholes across 150m stretch causing severe traffic slowdown.',
+    category: 'pothole', severity: 'high', status: 'resolved', district: 'Trichy',
+    location_lat: 10.8307, location_lng: 78.6958, location_address: 'Srirangam Approach, Trichy',
+    reporter_email: 'arjun@example.com', assigned_email: 'ganesh@roadwatch.gov', ai_confidence: 93,
     resolution: 'Full road resurfacing completed for 200m stretch.',
   },
   {
     id: 'RW-2026-0009',
-    title: 'Sinkhole forming on Sarjapur Road',
-    description: 'Small sinkhole forming near Wipro junction. Underground water pipe suspected.',
-    category: 'hazard', severity: 'critical', status: 'pending', district: 'Coimbatore Region',
-    location_lat: 12.9100, location_lng: 77.6850, location_address: 'Sarjapur Road, Bangalore',
+    title: 'Sinkhole forming near Bhavani Road',
+    description: 'Sinkhole formation near roadside drain; urgent barricading required.',
+    category: 'hazard', severity: 'critical', status: 'pending', district: 'Erode',
+    location_lat: 11.3564, location_lng: 77.7139, location_address: 'Bhavani Road, Erode',
     reporter_email: 'anand@example.com', assigned_email: null, ai_confidence: 76,
   },
   {
     id: 'RW-2026-0010',
-    title: 'Uneven road patch on Electronic City',
-    description: 'Previous repair patch has become uneven and creates a bump hazard at high speed.',
-    category: 'crack', severity: 'medium', status: 'assigned', district: 'Coimbatore Region',
-    location_lat: 12.8440, location_lng: 77.6603, location_address: 'Electronic City Phase 1, Bangalore',
-    reporter_email: 'lakshmi@example.com', assigned_email: 'sunita@roadwatch.gov', ai_confidence: 85,
+    title: 'Uneven repair patch near Hasthampatti',
+    description: 'Repair patch has become uneven and causes sharp shocks at speed.',
+    category: 'crack', severity: 'medium', status: 'assigned', district: 'Salem',
+    location_lat: 11.6747, location_lng: 78.1223, location_address: 'Hasthampatti, Salem',
+    reporter_email: 'lakshmi@example.com', assigned_email: 'preethi@roadwatch.gov', ai_confidence: 85,
   },
 ]
 
@@ -160,8 +161,9 @@ export const seedCoreData = async () => {
     for (const report of reportsSeed) {
       const reportedBy = citizenMap.get(report.reporter_email)
       const assignedTo = report.assigned_email ? adminMap.get(report.assigned_email) : null
+      const resolvedDistrict = resolveDistrictFromCoordinates(report.location_lat, report.location_lng)
 
-      if (!reportedBy) continue
+      if (!reportedBy || !resolvedDistrict) continue
 
       await client.query(
         `
@@ -202,7 +204,7 @@ export const seedCoreData = async () => {
           report.category,
           report.severity,
           report.status,
-          report.district,
+          resolvedDistrict,
           report.location_lat,
           report.location_lng,
           report.location_address,
@@ -214,6 +216,27 @@ export const seedCoreData = async () => {
         ],
       )
     }
+
+    // Normalize all existing reports so district routing always follows coordinates.
+    const existingReports = await client.query('SELECT id, location_lat, location_lng FROM reports')
+    for (const reportRow of existingReports.rows) {
+      const normalizedDistrict = resolveDistrictFromCoordinates(
+        Number(reportRow.location_lat),
+        Number(reportRow.location_lng),
+      )
+
+      if (!normalizedDistrict) continue
+
+      await client.query(
+        'UPDATE reports SET district = $1 WHERE id = $2',
+        [normalizedDistrict, reportRow.id],
+      )
+    }
+
+    await client.query(
+      'DELETE FROM reports WHERE district <> ALL($1::text[])',
+      [SUPPORTED_DISTRICTS],
+    )
 
     await client.query('COMMIT')
     console.log('Seeded core data: 5 district admins, 8 citizens, 10 reports')
