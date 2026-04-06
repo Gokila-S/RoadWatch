@@ -13,6 +13,34 @@ import { errorHandler } from './middleware/errorHandler.js'
 
 const app = express()
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const bootstrapDatabase = async () => {
+  const maxAttempts = 5
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await initializeDatabase()
+      await seedSuperAdmin()
+      await seedCoreData()
+      return
+    } catch (error) {
+      const isLastAttempt = attempt === maxAttempts
+      console.error(
+        `Database bootstrap attempt ${attempt}/${maxAttempts} failed:`,
+        error?.message || error,
+      )
+
+      if (isLastAttempt) {
+        throw error
+      }
+
+      // Exponential backoff: 2s, 4s, 8s, 16s
+      await sleep(2 ** attempt * 1000)
+    }
+  }
+}
+
 app.use(cors({ origin: env.frontendOrigin, credentials: true }))
 app.use(express.json({ limit: '2mb' }))
 
@@ -29,9 +57,7 @@ app.use('/api/media', mediaRouter)
 app.use(errorHandler)
 
 const startServer = async () => {
-  await initializeDatabase()
-  await seedSuperAdmin()
-  await seedCoreData()
+  await bootstrapDatabase()
 
   app.listen(env.port, () => {
     console.log(`RoadWatch API running on http://localhost:${env.port}`)
