@@ -101,7 +101,7 @@ const ReportTracker = () => {
 
             {/* Exact Location Map */}
             <div className="card p-0 overflow-hidden h-48 border border-subtle">
-               <MapView center={[report.location.lat, report.location.lng]} zoom={15} interactive={false} reports={[report]} />
+              <MapView center={[report.location.lat, report.location.lng]} zoom={15} interactive={true} reports={[report]} colorBy="status" />
             </div>
           </div>
 
@@ -120,7 +120,10 @@ const ReportTracker = () => {
                     const isCurrent = idx === currentStepIdx
 
                     return (
-                      <div key={idx} className={`timeline-item ${isCompleted ? 'completed' : 'pending'} ${isCurrent ? 'current' : ''}`}>
+                      <div
+                        key={idx}
+                        className={`timeline-item ${isCompleted ? 'completed' : 'pending'} ${isCurrent ? 'current' : ''} ${isCurrent && report.status === 'resolved' ? 'current-resolved' : ''}`}
+                      >
                          <div className="timeline-marker">
                             {isCompleted ? <CheckCircle2 size={16} /> : <div className="w-2 h-2 rounded-full bg-dim"></div>}
                          </div>

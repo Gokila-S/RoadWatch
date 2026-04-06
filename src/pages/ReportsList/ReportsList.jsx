@@ -1,21 +1,50 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Search, Filter, Calendar, MapPin, X,
-  ArrowUpDown, Download, CheckSquare, AlertTriangle, CheckCircle2, HardHat, FileBox, XCircle, ChevronRight
+  ArrowUpDown, Download, CheckSquare, AlertTriangle, CheckCircle2, HardHat, FileBox, XCircle, ChevronRight, Droplets, AlertOctagon, Construction
 } from 'lucide-react'
 import useStore from '../../store/useStore'
 import { StatusBadge, SeverityBadge, AiConfidenceBadge } from '../../components/StatusBadge/StatusBadge'
 import './ReportsList.css'
 
+const CATEGORY_CONFIG = {
+  pothole: { label: 'Pothole', icon: AlertTriangle },
+  waterlogging: { label: 'Waterlogging', icon: Droplets },
+  hazard: { label: 'Hazard', icon: AlertOctagon },
+  crack: { label: 'Road Crack', icon: Construction },
+}
+
+const hasValidReportImage = (report) => Boolean(report?.images?.[0]) && !report.images[0].includes('placeholder')
+
 const ReportsList = () => {
   const { reports, updateReportStatus, fetchReports, user } = useStore()
+  const location = useLocation()
 
   useEffect(() => {
-    fetchReports().catch((error) => {
+    const params = new URLSearchParams(location.search)
+    const query = {}
+
+    const status = params.get('status')
+    const severity = params.get('severity')
+    const district = params.get('district')
+    const category = params.get('category')
+
+    if (status) query.status = status
+    if (severity) query.severity = severity
+    if (district) query.district = district
+    if (category) query.category = category
+
+    fetchReports(query).catch((error) => {
       console.error('Failed to fetch reports list', error)
     })
-  }, [fetchReports])
+
+    if (status) setStatusFilter(status)
+    if (severity) setSeverityFilter(severity)
+    if (district) setDistrictFilter(district)
+    if (category) setCategoryFilter(category)
+  }, [fetchReports, location.search])
   
   const adminReports = user?.role === 'super_admin' 
     ? reports 
@@ -25,6 +54,8 @@ const ReportsList = () => {
   const [dateRange, setDateRange] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [severityFilter, setSeverityFilter] = useState('all')
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [districtFilter, setDistrictFilter] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState('date_desc')
   const [selectedIds, setSelectedIds] = useState([])
@@ -35,6 +66,16 @@ const ReportsList = () => {
   // Side Panel State
   const [selectedReport, setSelectedReport] = useState(null)
   const [assigningMode, setAssigningMode] = useState(false)
+
+  const districtOptions = useMemo(() => {
+    const unique = new Set(
+      adminReports
+        .map((report) => report.district)
+        .filter((name) => Boolean(name && typeof name === 'string')),
+    )
+
+    return Array.from(unique).sort((a, b) => a.localeCompare(b))
+  }, [adminReports])
 
   // Derived filtered & sorted data
   const filteredAndSortedReports = useMemo(() => {
@@ -53,6 +94,8 @@ const ReportsList = () => {
     // Filtering
     if (statusFilter !== 'all') result = result.filter(r => r.status === statusFilter)
     if (severityFilter !== 'all') result = result.filter(r => r.severity === severityFilter)
+    if (categoryFilter !== 'all') result = result.filter(r => r.category === categoryFilter)
+    if (districtFilter !== 'all') result = result.filter(r => r.district === districtFilter)
     
     // SLA Filtering
     if (slaFilter !== 'all') {
@@ -105,7 +148,7 @@ const ReportsList = () => {
     })
 
     return result
-  }, [adminReports, dateRange, statusFilter, severityFilter, searchQuery, sortBy, slaFilter, confidenceFilter])
+  }, [adminReports, dateRange, statusFilter, severityFilter, categoryFilter, districtFilter, searchQuery, sortBy, slaFilter, confidenceFilter])
 
   // Handlers
   const toggleSelectAll = () => {
@@ -220,6 +263,50 @@ const ReportsList = () => {
           </div>
 
           <div className="filter-group">
+            <h4 className="filter-heading">Issue Type</h4>
+            <div className="chip-container-side">
+              {[
+                { id: 'all', label: 'All' },
+                { id: 'pothole', label: 'Pothole' },
+                { id: 'waterlogging', label: 'Waterlogging' },
+                { id: 'hazard', label: 'Hazard' },
+                { id: 'crack', label: 'Road Crack' },
+              ].map(category => (
+                <button
+                  key={category.id}
+                  className={`filter-chip-side ${categoryFilter === category.id ? 'active' : ''}`}
+                  onClick={() => setCategoryFilter(category.id)}
+                >
+                  {category.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {user?.role === 'super_admin' && (
+            <div className="filter-group">
+              <h4 className="filter-heading">District</h4>
+              <div className="chip-container-side">
+                <button
+                  className={`filter-chip-side ${districtFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setDistrictFilter('all')}
+                >
+                  All
+                </button>
+                {districtOptions.map((district) => (
+                  <button
+                    key={district}
+                    className={`filter-chip-side ${districtFilter === district ? 'active' : ''}`}
+                    onClick={() => setDistrictFilter(district)}
+                  >
+                    {district}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="filter-group">
             <h4 className="filter-heading">SLA Status</h4>
             <div className="chip-container-side">
                {[
@@ -295,6 +382,8 @@ const ReportsList = () => {
            <div className="report-card-grid">
              {filteredAndSortedReports.map(report => {
                 const isCritical = report.severity === 'critical';
+               const categoryMeta = CATEGORY_CONFIG[report.category]
+               const CategoryIcon = categoryMeta?.icon || MapPin
                 
                 // Rough SLA calc
                 const sladeadline = new Date(report.slaDeadline);
@@ -317,10 +406,12 @@ const ReportsList = () => {
                      </div>
 
                      <div className="card-image-box">
-                       {report.images?.[0] && !report.images[0].includes('placeholder') ? (
+                       {hasValidReportImage(report) ? (
                          <img src={report.images[0]} alt="report image" />
                        ) : (
-                         <div className="no-image">NO VISUAL</div>
+                         <div className="no-image" aria-label={`${categoryMeta?.label || 'Report'} image missing`}>
+                           <CategoryIcon className="no-image-icon" size={34} />
+                         </div>
                        )}
                        <div className="status-overlay">
                          <StatusBadge status={report.status} />
@@ -401,10 +492,15 @@ const ReportsList = () => {
               
               <div className="side-panel-content">
                 <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)', height: '240px', flexShrink: 0, backgroundColor: '#000' }}>
-                   {selectedReport.images[0]?.includes('placeholder') ? (
-                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem' }}>[ NO IMAGE EVIDENCE ]</div>
-                   ) : (
+                   {hasValidReportImage(selectedReport) ? (
                      <img src={selectedReport.images[0]} alt="evidence" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }} />
+                   ) : (
+                     <div className="no-image no-image-detail" aria-label={`${CATEGORY_CONFIG[selectedReport.category]?.label || 'Report'} image missing`}>
+                       {(() => {
+                         const DetailIcon = CATEGORY_CONFIG[selectedReport.category]?.icon || MapPin
+                         return <DetailIcon className="no-image-icon" size={42} />
+                       })()}
+                     </div>
                    )}
                    <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px', background: 'rgba(0,0,0,0.8)', padding: '4px', borderRadius: '6px' }}>
                      <StatusBadge status={selectedReport.status} />

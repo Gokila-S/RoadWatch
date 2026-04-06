@@ -1,17 +1,58 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, BarChart, Bar } from 'recharts'
 import useStore from '../../store/useStore'
 import './Analytics.css'
 
 const Analytics = () => {
-  const { analyticsMonthly, issueCategories, districts, analyticsSummary, fetchAnalytics } = useStore()
+  const { analyticsMonthly, issueCategories, districts, analyticsSummary, fetchAnalytics, user } = useStore()
+  const [selectedDistrict, setSelectedDistrict] = useState('all')
+  const [districtOptions, setDistrictOptions] = useState([])
+
+  const districtRows = useMemo(() => {
+    const toNumber = (value) => {
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed : 0
+    }
+
+    return (Array.isArray(districts) ? districts : []).map((district, index) => {
+      const totalIssues = toNumber(district.totalIssues)
+      const resolved = toNumber(district.resolved)
+      const pending = toNumber(district.pending)
+      const rawRate = totalIssues > 0 ? (resolved / totalIssues) * 100 : 0
+      const safeRate = Math.max(0, Math.min(100, rawRate))
+
+      return {
+        id: district.id || `district-${index}`,
+        name: district.name || 'Unknown District',
+        admin: district.admin || 'Unassigned',
+        totalIssues,
+        resolved,
+        pending,
+        avgResolution: district.avgResolution || 'N/A',
+        resolutionRate: Math.round(safeRate),
+        hasDataAnomaly: rawRate > 100,
+      }
+    })
+  }, [districts])
 
   useEffect(() => {
-    fetchAnalytics().catch((error) => {
-      console.error('Failed to fetch analytics', error)
-    })
-  }, [fetchAnalytics])
+    const query = user?.role === 'super_admin' && selectedDistrict !== 'all'
+      ? { district: selectedDistrict }
+      : {}
+
+    fetchAnalytics(query)
+      .then((data) => {
+        if (user?.role !== 'super_admin') return
+        if (selectedDistrict !== 'all') return
+
+        const options = Array.from(new Set((data?.districtPerformance || []).map((row) => row.district))).filter(Boolean)
+        setDistrictOptions(options.sort((a, b) => a.localeCompare(b)))
+      })
+      .catch((error) => {
+        console.error('Failed to fetch analytics', error)
+      })
+  }, [fetchAnalytics, selectedDistrict, user?.role])
 
   // Custom tooltips for dark theme
   const CustomTooltip = ({ active, payload, label }) => {
@@ -38,6 +79,23 @@ const Analytics = () => {
           <span className="badge-dot" style={{background: 'var(--signal-cyan)'}}></span>
           Live Data Stream Active
         </p>
+
+        {user?.role === 'super_admin' && (
+          <div className="analytics-filter-row">
+            <label className="analytics-filter-label" htmlFor="analytics-district-filter">District</label>
+            <select
+              id="analytics-district-filter"
+              className="analytics-filter-select"
+              value={selectedDistrict}
+              onChange={(event) => setSelectedDistrict(event.target.value)}
+            >
+              <option value="all">All Districts</option>
+              {districtOptions.map((districtName) => (
+                <option key={districtName} value={districtName}>{districtName}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Top Stats Row */}
@@ -49,7 +107,7 @@ const Analytics = () => {
         </motion.div>
         <motion.div className="stat-card glass-panel" initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{delay: 0.2}}>
            <p className="text-mono text-dim mb-2 text-xs">AVG SLA RESOLUTION TIME</p>
-           <h3 className="heading-display text-3xl">{districts.length} <span className="text-lg text-dim">Districts</span></h3>
+            <h3 className="heading-display text-3xl">{districtRows.length} <span className="text-lg text-dim">Districts</span></h3>
            <p className="text-signal-green text-xs mt-2">Live district coverage</p>
         </motion.div>
         <motion.div className="stat-card glass-panel" initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{delay: 0.3}}>
@@ -123,7 +181,7 @@ const Analytics = () => {
           <h3 className="text-sm font-semibold text-accent">District SLA Performance Matrix</h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse analytics-district-table">
             <thead>
               <tr className="bg-tertiary text-xs text-mono text-dim">
                 <th className="p-md font-normal">DISTRICT</th>
@@ -135,26 +193,39 @@ const Analytics = () => {
               </tr>
             </thead>
             <tbody>
-              {districts.map((district, i) => {
-                const resolutionRate = Math.round((district.resolved / district.totalIssues) * 100)
+              {districtRows.map((district) => {
                 return (
                   <tr key={district.id} className="border-b border-dim hover:bg-surface transition-colors">
                     <td className="p-md font-medium text-sm">{district.name}</td>
                     <td className="p-md text-secondary text-sm">{district.admin}</td>
-                    <td className="p-md text-right text-sm">{district.totalIssues}</td>
+                    <td className="p-md text-right text-sm metric-number">{district.totalIssues.toLocaleString('en-IN')}</td>
                     <td className="p-md text-right">
-                      <div className="flex items-center justify-end gap-sm">
-                        <span className="text-sm">{resolutionRate}%</span>
-                        <div className="w-16 h-1.5 bg-tertiary rounded-full overflow-hidden">
-                           <div className="h-full rounded-full" style={{width: `${resolutionRate}%`, background: resolutionRate > 85 ? 'var(--signal-green)' : 'var(--amber)'}}></div>
+                      <div className="resolution-cell">
+                        <div className="resolution-meta">
+                          <span className="text-sm metric-number">{district.resolutionRate}%</span>
+                          {district.hasDataAnomaly ? <span className="data-alert" title="Resolved count is higher than total issues for this district in source data.">Check data</span> : null}
                         </div>
+                        <div className="resolution-track">
+                          <div
+                            className="resolution-fill"
+                            style={{ width: `${district.resolutionRate}%` }}
+                          ></div>
+                        </div>
+                        <p className="resolution-subtext">{district.resolved} / {district.totalIssues}</p>
                       </div>
                     </td>
-                    <td className="p-md text-right text-sm">{district.pending}</td>
+                    <td className="p-md text-right text-sm metric-number">{district.pending.toLocaleString('en-IN')}</td>
                     <td className="p-md text-right text-sm text-mono text-secondary">{district.avgResolution}</td>
                   </tr>
                 )
               })}
+              {districtRows.length === 0 ? (
+                <tr>
+                  <td className="p-md text-center text-dim" colSpan={6}>
+                    No district analytics available.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
