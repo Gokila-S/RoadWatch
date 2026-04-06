@@ -193,7 +193,7 @@ const Login = () => {
                   <input
                     type="text"
                     className="input-field"
-                    placeholder="e.g. Chennai Region"
+                    placeholder="e.g. Coimbatore"
                     value={district}
                     onChange={(e) => setDistrict(e.target.value)}
                     required

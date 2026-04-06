@@ -2,12 +2,54 @@ import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ChevronLeft, Search, Filter, Clock, MapPin as MapPinIcon, 
-  AlertTriangle, CheckCircle2, Factory, XCircle, HardHat, AlertOctagon, ScanSearch
+  AlertTriangle, CheckCircle2, XCircle, HardHat, AlertOctagon, ScanSearch, Droplets, Construction
 } from 'lucide-react'
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
 import { StatusBadge, SeverityBadge, AiConfidenceBadge } from '../../components/StatusBadge/StatusBadge'
 import './Admin.css'
+
+const CATEGORY_CONFIG = {
+  pothole: { label: 'Pothole', icon: AlertTriangle },
+  waterlogging: { label: 'Waterlogging', icon: Droplets },
+  hazard: { label: 'Hazard', icon: AlertOctagon },
+  crack: { label: 'Road Crack', icon: Construction },
+}
+
+const DISTRICT_BOUNDARIES = {
+  Coimbatore: [
+    [10.9, 76.8],
+    [11.17, 76.8],
+    [11.17, 77.1],
+    [10.9, 77.1],
+  ],
+  Tiruppur: [
+    [11.0, 77.15],
+    [11.25, 77.15],
+    [11.25, 77.45],
+    [11.0, 77.45],
+  ],
+  Erode: [
+    [11.2, 77.55],
+    [11.52, 77.55],
+    [11.52, 77.95],
+    [11.2, 77.95],
+  ],
+  Salem: [
+    [11.45, 77.95],
+    [11.9, 77.95],
+    [11.9, 78.35],
+    [11.45, 78.35],
+  ],
+  Trichy: [
+    [10.65, 78.45],
+    [11.0, 78.45],
+    [11.0, 78.95],
+    [10.65, 78.95],
+  ],
+}
+
+const hasValidReportImage = (report) => Boolean(report?.images?.[0]) && !report.images[0].includes('placeholder')
 
 const Admin = () => {
   const { 
@@ -23,6 +65,7 @@ const Admin = () => {
   const [assigningId, setAssigningId] = useState(null) // ID of report being assigned
   const [searchQuery, setSearchQuery] = useState('')
   const [bulkMode, setBulkMode] = useState(false)
+  const [filterCategory, setFilterCategory] = useState('all')
 
   useEffect(() => {
     fetchReports().catch((error) => {
@@ -39,12 +82,14 @@ const Admin = () => {
   const filteredReports = adminReports.filter(r => {
     if (filterStatus !== 'all' && r.status !== filterStatus) return false
     if (filterSeverity !== 'all' && r.severity !== filterSeverity) return false
+    if (filterCategory !== 'all' && r.category !== filterCategory) return false
     if (searchQuery && !r.title.toLowerCase().includes(searchQuery.toLowerCase()) && !r.id.toLowerCase().includes(searchQuery.toLowerCase())) return false
     return true
   })
 
   const pendingCount = adminReports.filter(r => r.status === 'pending').length
   const criticalCount = adminReports.filter(r => r.severity === 'critical' && r.status !== 'resolved').length
+  const districtBoundary = user?.district ? DISTRICT_BOUNDARIES[user.district] : null
 
   const handleAction = async (status, note = '') => {
     if (selectedReport) {
@@ -78,10 +123,13 @@ const Admin = () => {
 
           <MapView 
             reports={filteredReports} 
-            center={user?.role === 'super_admin' ? [12.9716, 77.5946] : [13.0358, 77.5970]} 
+            center={user?.role === 'super_admin' ? [11.15, 77.75] : [11.05, 77.65]} 
             zoom={12}
             colorBy="status"
             onMarkerClick={(report) => setSelectedReport(report)}
+            districtBoundary={districtBoundary}
+            showDistrictBoundary={Boolean(districtBoundary && user?.role !== 'super_admin')}
+            focusOnDistrictBoundary={Boolean(districtBoundary && user?.role !== 'super_admin')}
           />
           
           {/* FLOATING STATS OVERLAY */}
@@ -145,6 +193,13 @@ const Admin = () => {
                      <option value="medium">Medium</option>
                      <option value="low">Low</option>
                    </select>
+                   <select className="filter-select" style={{ flex: 1, minWidth: 0 }} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                     <option value="all">Category: All</option>
+                     <option value="pothole">Pothole</option>
+                     <option value="waterlogging">Waterlogging</option>
+                     <option value="hazard">Hazard</option>
+                     <option value="crack">Road Crack</option>
+                   </select>
                  </div>
                </div>
                
@@ -152,6 +207,8 @@ const Admin = () => {
                <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
                  {filteredReports.map(report => {
                    const sla = getSLAStatus(report.slaDeadline)
+                   const categoryMeta = CATEGORY_CONFIG[report.category]
+                   const CategoryIcon = categoryMeta?.icon || MapPinIcon
                    return (
                      <div 
                        key={report.id} 
@@ -159,10 +216,12 @@ const Admin = () => {
                        onClick={() => setSelectedReport(report)}
                      >
                        <div style={{ width: '64px', height: '64px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0, backgroundColor: '#000' }}>
-                         {report.images[0]?.includes('placeholder') ? (
-                           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>NO IMG</div>
-                         ) : (
+                         {hasValidReportImage(report) ? (
                            <img src={report.images[0]} alt="Issue" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                         ) : (
+                           <div className="admin-report-thumb-fallback" aria-label={`${categoryMeta?.label || 'Report'} image missing`}>
+                             <CategoryIcon size={20} />
+                           </div>
                          )}
                        </div>
                        
@@ -209,10 +268,15 @@ const Admin = () => {
                  <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
                    {/* Visual Context */}
                    <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)', minHeight: '200px', height: '200px', flexShrink: 0, backgroundColor: '#000' }}>
-                     {selectedReport.images[0]?.includes('placeholder') ? (
-                       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>[ NO EVIDENCE SUBMITTED ]</div>
-                     ) : (
+                     {hasValidReportImage(selectedReport) ? (
                        <img src={selectedReport.images[0]} alt="evidence" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                     ) : (
+                       <div className="admin-detail-fallback" aria-label={`${CATEGORY_CONFIG[selectedReport.category]?.label || 'Report'} image missing`}>
+                         {(() => {
+                           const DetailIcon = CATEGORY_CONFIG[selectedReport.category]?.icon || MapPinIcon
+                           return <DetailIcon size={34} />
+                         })()}
+                       </div>
                      )}
                      <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '8px' }}>
                        <StatusBadge status={selectedReport.status} />
