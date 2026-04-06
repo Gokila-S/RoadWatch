@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { useEffect, useMemo } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, Polygon, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import './MapView.css'
 
@@ -45,6 +45,33 @@ const userIcon = L.divIcon({
   popupAnchor: [0, -40],
 })
 
+const RecenterMap = ({ center, zoom }) => {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!Array.isArray(center) || center.length !== 2) return
+    map.setView(center, zoom, { animate: true })
+  }, [map, center, zoom])
+
+  return null
+}
+
+const FitBoundary = ({ boundary = null, enabled = false, padding = [28, 28] }) => {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!enabled || !Array.isArray(boundary) || boundary.length < 3) return
+
+    const bounds = L.latLngBounds(boundary)
+    if (!bounds.isValid()) return
+
+    // Fit once per boundary update so user interactions are not constantly overridden.
+    map.fitBounds(bounds, { padding, animate: true, maxZoom: 13 })
+  }, [map, boundary, enabled, padding])
+
+  return null
+}
+
 const MapView = ({
   reports = [],
   center = [12.9716, 77.5946],
@@ -56,6 +83,10 @@ const MapView = ({
   interactive = true,
   className = '',
   showUserLocation = false,
+  userLocation = null,
+  districtBoundary = null,
+  showDistrictBoundary = false,
+  focusOnDistrictBoundary = false,
 }) => {
   const markers = useMemo(() => {
     return reports.map(report => ({
@@ -75,6 +106,10 @@ const MapView = ({
         zoom={zoom}
         scrollWheelZoom={interactive}
         dragging={interactive}
+        touchZoom={interactive}
+        doubleClickZoom={interactive}
+        boxZoom={interactive}
+        keyboard={interactive}
         zoomControl={interactive}
         style={{ height: '100%', width: '100%' }}
       >
@@ -82,9 +117,25 @@ const MapView = ({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+
+        {!focusOnDistrictBoundary && <RecenterMap center={center} zoom={zoom} />}
+        <FitBoundary boundary={districtBoundary} enabled={focusOnDistrictBoundary} />
+
+        {showDistrictBoundary && Array.isArray(districtBoundary) && districtBoundary.length >= 3 && (
+          <Polygon
+            positions={districtBoundary}
+            pathOptions={{
+              color: '#0dcbf2',
+              weight: 2,
+              dashArray: '8 8',
+              fillColor: '#0dcbf2',
+              fillOpacity: 0.08,
+            }}
+          />
+        )}
         
-        {showUserLocation && (
-          <Marker position={center} icon={userIcon}>
+        {showUserLocation && userLocation && (
+          <Marker position={userLocation} icon={userIcon}>
              <Popup><div className="map-popup text-center"><strong>You are here</strong></div></Popup>
           </Marker>
         )}
@@ -98,7 +149,7 @@ const MapView = ({
               click: () => onMarkerClick?.(report),
             }}
           >
-            <Popup>
+            <Popup autoPan={false}>
               <div className="map-popup">
                 <p className="map-popup-id">{report.id}</p>
                 <p className="map-popup-title">{report.title}</p>
@@ -107,7 +158,14 @@ const MapView = ({
                     <span className="badge-dot"></span>
                     {report.status}
                   </span>
-                  <span className={`badge badge-${report.severity === 'critical' ? 'critical' : 'pending'}`}>
+                  <span
+                    className="badge"
+                    style={{
+                      borderColor: `${SEVERITY_COLORS[report.severity] || '#f59e0b'}66`,
+                      color: SEVERITY_COLORS[report.severity] || '#f59e0b',
+                      background: `${SEVERITY_COLORS[report.severity] || '#f59e0b'}1f`,
+                    }}
+                  >
                     {report.severity}
                   </span>
                 </div>
