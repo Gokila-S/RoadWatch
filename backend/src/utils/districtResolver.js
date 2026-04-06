@@ -1,29 +1,71 @@
-const DISTRICT_CENTROIDS = [
-  { district: 'Chennai Region', lat: 13.0358, lng: 77.597 },
-  { district: 'Trichy Region', lat: 12.9716, lng: 77.607 },
-  { district: 'Madurai Region', lat: 12.956, lng: 77.641 },
-  { district: 'Coimbatore Region', lat: 12.889, lng: 77.574 },
-  { district: 'Salem Region', lat: 12.95, lng: 77.53 },
+const DISTRICT_GEOFENCES = [
+  {
+    district: 'Coimbatore',
+    polygon: [
+      [10.9, 76.8],
+      [11.17, 76.8],
+      [11.17, 77.1],
+      [10.9, 77.1],
+    ],
+  },
+  {
+    district: 'Tiruppur',
+    polygon: [
+      [11.0, 77.15],
+      [11.25, 77.15],
+      [11.25, 77.45],
+      [11.0, 77.45],
+    ],
+  },
+  {
+    district: 'Erode',
+    polygon: [
+      [11.2, 77.55],
+      [11.52, 77.55],
+      [11.52, 77.95],
+      [11.2, 77.95],
+    ],
+  },
+  {
+    district: 'Salem',
+    polygon: [
+      [11.45, 77.95],
+      [11.9, 77.95],
+      [11.9, 78.35],
+      [11.45, 78.35],
+    ],
+  },
+  {
+    district: 'Trichy',
+    polygon: [
+      [10.65, 78.45],
+      [11.0, 78.45],
+      [11.0, 78.95],
+      [10.65, 78.95],
+    ],
+  },
 ]
+
+export const SUPPORTED_DISTRICTS = DISTRICT_GEOFENCES.map((item) => item.district)
 
 const isValidCoordinate = (value) => Number.isFinite(value)
 
-const toRadians = (value) => (value * Math.PI) / 180
+const isPointInPolygon = (lat, lng, polygon) => {
+  let inside = false
 
-const haversineDistanceKm = (aLat, aLng, bLat, bLng) => {
-  const earthRadiusKm = 6371
-  const dLat = toRadians(bLat - aLat)
-  const dLng = toRadians(bLng - aLng)
-  const lat1 = toRadians(aLat)
-  const lat2 = toRadians(bLat)
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [latI, lngI] = polygon[i]
+    const [latJ, lngJ] = polygon[j]
 
-  const sinLat = Math.sin(dLat / 2)
-  const sinLng = Math.sin(dLng / 2)
+    const intersects = (
+      (lngI > lng) !== (lngJ > lng)
+      && lat < ((latJ - latI) * (lng - lngI)) / (lngJ - lngI) + latI
+    )
 
-  const value = sinLat * sinLat + Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng
-  const centralAngle = 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value))
+    if (intersects) inside = !inside
+  }
 
-  return earthRadiusKm * centralAngle
+  return inside
 }
 
 export const resolveDistrictFromCoordinates = (lat, lng) => {
@@ -31,16 +73,15 @@ export const resolveDistrictFromCoordinates = (lat, lng) => {
     return null
   }
 
-  let nearest = DISTRICT_CENTROIDS[0]
-  let shortestDistance = haversineDistanceKm(lat, lng, nearest.lat, nearest.lng)
-
-  for (const candidate of DISTRICT_CENTROIDS.slice(1)) {
-    const distance = haversineDistanceKm(lat, lng, candidate.lat, candidate.lng)
-    if (distance < shortestDistance) {
-      nearest = candidate
-      shortestDistance = distance
+  for (const district of DISTRICT_GEOFENCES) {
+    if (isPointInPolygon(lat, lng, district.polygon)) {
+      return district.district
     }
   }
 
-  return nearest.district
+  return null
 }
+
+export const DISTRICT_BOUNDARIES = DISTRICT_GEOFENCES
+
+export const isSupportedDistrict = (district) => SUPPORTED_DISTRICTS.includes(district)

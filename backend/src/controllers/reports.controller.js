@@ -1,5 +1,5 @@
 import { pool } from '../config/db.js'
-import { resolveDistrictFromCoordinates } from '../utils/districtResolver.js'
+import { resolveDistrictFromCoordinates, SUPPORTED_DISTRICTS } from '../utils/districtResolver.js'
 
 const mapReportRow = (row) => ({
   id: row.id,
@@ -25,11 +25,31 @@ const mapReportRow = (row) => ({
   slaDeadline: row.sla_deadline,
 })
 
+const toRadians = (value) => (value * Math.PI) / 180
+
+const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
+  const earthRadiusKm = 6371
+  const dLat = toRadians(lat2 - lat1)
+  const dLon = toRadians(lon2 - lon1)
+
+  const a = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) * Math.sin(dLon / 2) ** 2
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+
+  return earthRadiusKm * c
+}
+
 export const listReports = async (req, res, next) => {
   try {
-    const { status, severity, district } = req.query
+    const { status, severity, district, scope, lat, lng, radiusKm } = req.query
     const filters = []
     const values = []
+    const requestedLat = Number(lat)
+    const requestedLng = Number(lng)
+    const requestedRadiusKm = Number(radiusKm || 100)
+
+    const hasMapCoordinates = Number.isFinite(requestedLat) && Number.isFinite(requestedLng)
+    const wantsCitizenMapScope = req.user.role === 'citizen' && scope === 'map' && hasMapCoordinates
 
     if (status) {
       values.push(status)
@@ -46,7 +66,7 @@ export const listReports = async (req, res, next) => {
       filters.push(`r.district = $${values.length}`)
     }
 
-    if (req.user.role === 'citizen') {
+    if (req.user.role === 'citizen' && !wantsCitizenMapScope) {
       values.push(req.user.sub)
       filters.push(`r.reported_by = $${values.length}`)
     }
@@ -55,6 +75,9 @@ export const listReports = async (req, res, next) => {
       values.push(req.user.district)
       filters.push(`r.district = $${values.length}`)
     }
+
+    values.push(SUPPORTED_DISTRICTS)
+    filters.push(`r.district = ANY($${values.length}::text[])`)
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : ''
 
@@ -72,16 +95,50 @@ export const listReports = async (req, res, next) => {
     `
 
     const result = await pool.query(query, values)
-    return res.json({ reports: result.rows.map(mapReportRow) })
+    const mappedReports = result.rows.map(mapReportRow)
+
+    const districtScopedReports = req.user.role === 'district_admin'
+      ? mappedReports.filter((report) => {
+        const resolvedDistrict = resolveDistrictFromCoordinates(
+          Number(report.location?.lat),
+          Number(report.location?.lng),
+        )
+        return resolvedDistrict === req.user.district
+      })
+      : mappedReports
+
+    if (wantsCitizenMapScope) {
+      const boundedRadius = Number.isFinite(requestedRadiusKm) ? Math.max(1, Math.min(300, requestedRadiusKm)) : 100
+      const filteredReports = districtScopedReports.filter((report) => {
+        if (report.reportedBy === req.user.sub) {
+          return true
+        }
+
+        const latValue = Number(report.location?.lat)
+        const lngValue = Number(report.location?.lng)
+        if (!Number.isFinite(latValue) || !Number.isFinite(lngValue)) {
+          return false
+        }
+
+        return calculateDistanceKm(requestedLat, requestedLng, latValue, lngValue) <= boundedRadius
+      })
+
+      return res.json({ reports: filteredReports })
+    }
+
+    return res.json({ reports: districtScopedReports })
   } catch (error) {
     return next(error)
   }
 }
 
 export const createReport = async (req, res, next) => {
-  const client = await pool.connect()
+  let client
+  let inTransaction = false
 
   try {
+    client = await pool.connect()
+
     const {
       title,
       description,
@@ -93,7 +150,7 @@ export const createReport = async (req, res, next) => {
       slaHours = 72,
     } = req.body
 
-    if (!title || !description || !category || !severity || !location?.address) {
+    if (!description || !category || !severity || !location?.address) {
       return res.status(400).json({ message: 'Missing required report fields' })
     }
 
@@ -103,6 +160,12 @@ export const createReport = async (req, res, next) => {
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
       return res.status(400).json({ message: 'Valid location coordinates are required' })
     }
+
+    const rawAddress = typeof location.address === 'string' ? location.address.trim() : ''
+    const locationAnchor = rawAddress ? rawAddress.split(',')[0].trim() : 'reported location'
+    const normalizedTitle = typeof title === 'string' && title.trim()
+      ? title.trim()
+      : `${category.charAt(0).toUpperCase() + category.slice(1)} near ${locationAnchor}`
 
     const district = resolveDistrictFromCoordinates(lat, lng)
     if (!district) {
@@ -114,6 +177,7 @@ export const createReport = async (req, res, next) => {
     }
 
     await client.query('BEGIN')
+    inTransaction = true
 
     const countResult = await client.query("SELECT COUNT(*)::int AS total FROM reports WHERE id LIKE 'RW-%'")
     const serial = String(countResult.rows[0].total + 1).padStart(4, '0')
@@ -131,7 +195,7 @@ export const createReport = async (req, res, next) => {
       `,
       [
         reportId,
-        title.trim(),
+        normalizedTitle,
         description.trim(),
         category,
         severity,
@@ -151,16 +215,25 @@ export const createReport = async (req, res, next) => {
     const reporter = await client.query('SELECT full_name FROM profiles WHERE id = $1', [req.user.sub])
 
     await client.query('COMMIT')
+    inTransaction = false
 
     return res.status(201).json({
       message: 'Report created successfully',
       report: mapReportRow({ ...report, reporter_name: reporter.rows[0]?.full_name || 'Citizen' }),
     })
   } catch (error) {
-    await client.query('ROLLBACK')
+    if (client && inTransaction) {
+      try {
+        await client.query('ROLLBACK')
+      } catch {
+        // Ignore rollback errors caused by broken connections.
+      }
+    }
     return next(error)
   } finally {
-    client.release()
+    if (client) {
+      client.release()
+    }
   }
 }
 

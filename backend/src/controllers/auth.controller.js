@@ -28,9 +28,12 @@ const issueToken = (user) => jwt.sign(
 )
 
 export const signupCitizen = async (req, res, next) => {
-  const client = await pool.connect()
+  let client
+  let inTransaction = false
 
   try {
+    client = await pool.connect()
+
     const { full_name, email, password, phone, district } = req.body
 
     if (!full_name || !email || !password || !phone || !district) {
@@ -40,6 +43,7 @@ export const signupCitizen = async (req, res, next) => {
     const normalizedEmail = email.trim().toLowerCase()
 
     await client.query('BEGIN')
+    inTransaction = true
 
     const duplicate = await client.query('SELECT id FROM auth_users WHERE email = $1', [normalizedEmail])
     if (duplicate.rowCount > 0) {
@@ -69,6 +73,7 @@ export const signupCitizen = async (req, res, next) => {
     )
 
     await client.query('COMMIT')
+    inTransaction = false
 
     return res.status(201).json({
       message: 'Citizen account created successfully',
@@ -83,10 +88,18 @@ export const signupCitizen = async (req, res, next) => {
       },
     })
   } catch (error) {
-    await client.query('ROLLBACK')
+    if (client && inTransaction) {
+      try {
+        await client.query('ROLLBACK')
+      } catch {
+        // Ignore rollback errors caused by broken connections.
+      }
+    }
     return next(error)
   } finally {
-    client.release()
+    if (client) {
+      client.release()
+    }
   }
 }
 
