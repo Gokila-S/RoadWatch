@@ -1,11 +1,25 @@
 import { pool } from '../config/db.js'
+import { SUPPORTED_DISTRICTS } from '../utils/districtResolver.js'
 
 export const getAnalytics = async (req, res, next) => {
   try {
-    const districtFilter = req.user.role === 'district_admin' ? req.user.district : null
+    const requestedDistrict = typeof req.query?.district === 'string' ? req.query.district.trim() : null
+    const districtFilter = req.user.role === 'district_admin'
+      ? req.user.district
+      : (requestedDistrict || null)
 
-    const where = districtFilter ? 'WHERE district = $1' : ''
-    const params = districtFilter ? [districtFilter] : []
+    const whereClauses = []
+    const params = []
+
+    params.push(SUPPORTED_DISTRICTS)
+    whereClauses.push(`district = ANY($${params.length}::text[])`)
+
+    if (districtFilter) {
+      params.push(districtFilter)
+      whereClauses.push(`district = $${params.length}`)
+    }
+
+    const where = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : ''
 
     const reportsResult = await pool.query(
       `
