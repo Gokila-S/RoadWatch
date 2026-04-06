@@ -391,6 +391,42 @@ const useStore = create((set, get) => ({
     return data
   },
 
+  updateDistrictAdmin: async (id, payload) => {
+    const token = get().token
+    const response = await fetch(`${API_BASE_URL}/api/admin/district-admins/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not update district admin')
+    }
+
+    return data
+  },
+
+  deleteDistrictAdmin: async (id) => {
+    const token = get().token
+    const response = await fetch(`${API_BASE_URL}/api/admin/district-admins/${id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not delete district admin')
+    }
+
+    return data
+  },
+
   districtAdmins: [],
 
   fetchDistrictAdmins: async () => {
@@ -557,11 +593,18 @@ const useStore = create((set, get) => ({
   issueCategories: [],
   analyticsSummary: null,
 
-  fetchAnalytics: async () => {
+  fetchAnalytics: async (query = {}) => {
     const token = get().token
     if (!token) return null
 
-    const response = await fetch(`${API_BASE_URL}/api/analytics`, {
+    const searchParams = new URLSearchParams()
+    if (query.district) {
+      searchParams.set('district', query.district)
+    }
+
+    const url = `${API_BASE_URL}/api/analytics${searchParams.toString() ? `?${searchParams.toString()}` : ''}`
+
+    const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     })
 

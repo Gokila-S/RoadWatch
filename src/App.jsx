@@ -28,7 +28,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 }
 
 function App() {
-  const { fetchCurrentUser, fetchReports, fetchAnalytics, token } = useStore()
+  const { fetchCurrentUser, fetchReports, fetchAnalytics, fetchDistrictAdmins, token } = useStore()
 
   useEffect(() => {
     if (!token) return
@@ -40,12 +40,16 @@ function App() {
       if (['district_admin', 'super_admin'].includes(currentUser?.role)) {
         await fetchAnalytics()
       }
+
+      if (currentUser?.role === 'super_admin') {
+        await fetchDistrictAdmins()
+      }
     }
 
     bootstrap().catch((error) => {
       console.error('Failed to bootstrap app data', error)
     })
-  }, [token, fetchCurrentUser, fetchReports, fetchAnalytics])
+  }, [token, fetchCurrentUser, fetchReports, fetchAnalytics, fetchDistrictAdmins])
 
   return (
     <div className="app">
