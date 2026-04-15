@@ -48,6 +48,34 @@ CREATE INDEX IF NOT EXISTS idx_reports_severity ON reports(severity);
 CREATE INDEX IF NOT EXISTS idx_reports_district ON reports(district);
 CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at);
 
+CREATE TABLE IF NOT EXISTS announcements (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('alert', 'update', 'maintenance')),
+  priority TEXT NOT NULL CHECK (priority IN ('normal', 'high', 'critical')) DEFAULT 'normal',
+  district TEXT NOT NULL,
+  ward TEXT,
+  location_lat DOUBLE PRECISION,
+  location_lng DOUBLE PRECISION,
+  report_categories TEXT[] NOT NULL DEFAULT '{}' CHECK (
+    report_categories <@ ARRAY['pothole', 'crack', 'hazard', 'waterlogging', 'erosion', 'signage', 'other']::text[]
+  ),
+  starts_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  is_published BOOLEAN NOT NULL DEFAULT TRUE,
+  created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT announcements_time_window CHECK (expires_at > starts_at)
+);
+
+CREATE INDEX IF NOT EXISTS idx_announcements_district ON announcements(district);
+CREATE INDEX IF NOT EXISTS idx_announcements_category ON announcements(category);
+CREATE INDEX IF NOT EXISTS idx_announcements_priority ON announcements(priority);
+CREATE INDEX IF NOT EXISTS idx_announcements_starts_at ON announcements(starts_at);
+CREATE INDEX IF NOT EXISTS idx_announcements_expires_at ON announcements(expires_at);
+
 -- Optional static seed block (runtime seeder also ensures super admin).
 INSERT INTO auth_users (id, email, password_hash)
 VALUES (

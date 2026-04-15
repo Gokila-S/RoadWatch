@@ -5,6 +5,7 @@ import adminRouter from './routes/admin.routes.js'
 import reportsRouter from './routes/reports.routes.js'
 import analyticsRouter from './routes/analytics.routes.js'
 import mediaRouter from './routes/media.routes.js'
+import announcementsRouter from './routes/announcements.routes.js'
 import { env } from './config/env.js'
 import { initializeDatabase } from './config/initDb.js'
 import { seedCoreData } from './config/seedCoreData.js'
@@ -53,6 +54,7 @@ app.use('/api/admin', adminRouter)
 app.use('/api/reports', reportsRouter)
 app.use('/api/analytics', analyticsRouter)
 app.use('/api/media', mediaRouter)
+app.use('/api/announcements', announcementsRouter)
 
 app.use(errorHandler)
 

@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ChevronLeft, Search, Filter, Clock, MapPin as MapPinIcon, 
-  AlertTriangle, CheckCircle2, XCircle, HardHat, AlertOctagon, ScanSearch, Droplets, Construction
+  AlertTriangle, CheckCircle2, XCircle, HardHat, AlertOctagon, ScanSearch, Droplets, Construction, BellRing, Trash2
 } from 'lucide-react'
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
@@ -57,6 +57,10 @@ const Admin = () => {
     user, 
     updateReportStatus, 
     fetchReports,
+    announcements,
+    fetchAnnouncements,
+    createAnnouncement,
+    deleteAnnouncement,
     filterStatus, setFilterStatus, 
     filterSeverity, setFilterSeverity 
   } = useStore()
@@ -66,12 +70,30 @@ const Admin = () => {
   const [searchQuery, setSearchQuery] = useState('')
   const [bulkMode, setBulkMode] = useState(false)
   const [filterCategory, setFilterCategory] = useState('all')
+  const [announcementError, setAnnouncementError] = useState('')
+  const [creatingAnnouncement, setCreatingAnnouncement] = useState(false)
+  const [announcementForm, setAnnouncementForm] = useState({
+    title: '',
+    message: '',
+    category: 'update',
+    priority: 'normal',
+    ward: '',
+    expiresInHours: '24',
+    reportCategories: [],
+  })
 
   useEffect(() => {
     fetchReports().catch((error) => {
       console.error('Failed to fetch reports for admin', error)
     })
   }, [fetchReports])
+
+  useEffect(() => {
+    const params = user?.district ? { district: user.district } : {}
+    fetchAnnouncements(params).catch((error) => {
+      console.error('Failed to fetch announcements for admin', error)
+    })
+  }, [fetchAnnouncements, user?.district])
   
   // District admins see their district, super admins see all
   const adminReports = user?.role === 'super_admin' 
@@ -90,6 +112,10 @@ const Admin = () => {
   const pendingCount = adminReports.filter(r => r.status === 'pending').length
   const criticalCount = adminReports.filter(r => r.severity === 'critical' && r.status !== 'resolved').length
   const districtBoundary = user?.district ? DISTRICT_BOUNDARIES[user.district] : null
+  const districtAnnouncements = useMemo(
+    () => announcements.filter((item) => !user?.district || item.district === user.district).slice(0, 8),
+    [announcements, user?.district],
+  )
 
   const handleAction = async (status, note = '') => {
     if (selectedReport) {
@@ -111,6 +137,70 @@ const Admin = () => {
     if (diffHours < 0) return { text: "DEADLINE BREACHED", class: "sla-critical text-xs px-2 py-1 rounded font-mono font-bold" }
     if (diffHours <= 12) return { text: `${Math.floor(diffHours)}h remaining`, class: "sla-critical text-xs px-2 py-1 rounded font-mono" }
     return { text: `${Math.floor(diffHours)}h remaining`, class: "sla-safe text-xs px-2 py-1 rounded font-mono" }
+  }
+
+  const handleAnnouncementCategoryToggle = (category) => {
+    setAnnouncementForm((prev) => {
+      const exists = prev.reportCategories.includes(category)
+      const next = exists
+        ? prev.reportCategories.filter((item) => item !== category)
+        : [...prev.reportCategories, category]
+
+      return { ...prev, reportCategories: next }
+    })
+  }
+
+  const handleAnnouncementSubmit = async () => {
+    setAnnouncementError('')
+
+    if (!announcementForm.title.trim() || !announcementForm.message.trim()) {
+      setAnnouncementError('Title and message are required')
+      return
+    }
+
+    const expiryHours = Number(announcementForm.expiresInHours)
+    if (!Number.isFinite(expiryHours) || expiryHours < 1 || expiryHours > 336) {
+      setAnnouncementError('Expiry must be between 1 and 336 hours')
+      return
+    }
+
+    setCreatingAnnouncement(true)
+
+    try {
+      const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000).toISOString()
+
+      await createAnnouncement({
+        title: announcementForm.title,
+        message: announcementForm.message,
+        category: announcementForm.category,
+        priority: announcementForm.priority,
+        ward: announcementForm.ward,
+        reportCategories: announcementForm.reportCategories,
+        expiresAt,
+      })
+
+      setAnnouncementForm({
+        title: '',
+        message: '',
+        category: 'update',
+        priority: 'normal',
+        ward: '',
+        expiresInHours: '24',
+        reportCategories: [],
+      })
+    } catch (error) {
+      setAnnouncementError(error.message || 'Failed to create announcement')
+    } finally {
+      setCreatingAnnouncement(false)
+    }
+  }
+
+  const handleAnnouncementDelete = async (id) => {
+    try {
+      await deleteAnnouncement(id)
+    } catch (error) {
+      setAnnouncementError(error.message || 'Failed to remove announcement')
+    }
   }
 
   return (
@@ -200,6 +290,99 @@ const Admin = () => {
                      <option value="hazard">Hazard</option>
                      <option value="crack">Road Crack</option>
                    </select>
+                 </div>
+               </div>
+
+               <div className="announcement-admin-panel">
+                 <h3 className="announcement-admin-title"><BellRing size={16} /> District Announcements</h3>
+                 <input
+                   type="text"
+                   className="search-input"
+                   placeholder="Title"
+                   value={announcementForm.title}
+                   onChange={(event) => setAnnouncementForm((prev) => ({ ...prev, title: event.target.value }))}
+                 />
+                 <textarea
+                   className="announcement-admin-message"
+                   placeholder="Short, actionable message for citizens"
+                   rows={3}
+                   value={announcementForm.message}
+                   onChange={(event) => setAnnouncementForm((prev) => ({ ...prev, message: event.target.value }))}
+                 />
+                 <div className="announcement-admin-controls">
+                   <select
+                     className="filter-select"
+                     value={announcementForm.category}
+                     onChange={(event) => setAnnouncementForm((prev) => ({ ...prev, category: event.target.value }))}
+                   >
+                     <option value="alert">Alert</option>
+                     <option value="update">Update</option>
+                     <option value="maintenance">Maintenance</option>
+                   </select>
+                   <select
+                     className="filter-select"
+                     value={announcementForm.priority}
+                     onChange={(event) => setAnnouncementForm((prev) => ({ ...prev, priority: event.target.value }))}
+                   >
+                     <option value="critical">Critical</option>
+                     <option value="high">High</option>
+                     <option value="normal">Normal</option>
+                   </select>
+                   <input
+                     type="text"
+                     className="search-input"
+                     placeholder="Ward (optional)"
+                     value={announcementForm.ward}
+                     onChange={(event) => setAnnouncementForm((prev) => ({ ...prev, ward: event.target.value }))}
+                   />
+                   <input
+                     type="number"
+                     min="1"
+                     max="336"
+                     className="search-input"
+                     placeholder="Expires in hours"
+                     value={announcementForm.expiresInHours}
+                     onChange={(event) => setAnnouncementForm((prev) => ({ ...prev, expiresInHours: event.target.value }))}
+                   />
+                 </div>
+                 <div className="announcement-category-tags">
+                   {['pothole', 'crack', 'hazard', 'waterlogging', 'erosion', 'signage', 'other'].map((category) => (
+                     <button
+                       key={category}
+                       type="button"
+                       className={`announcement-tag ${announcementForm.reportCategories.includes(category) ? 'active' : ''}`}
+                       onClick={() => handleAnnouncementCategoryToggle(category)}
+                     >
+                       {category}
+                     </button>
+                   ))}
+                 </div>
+                 {announcementError ? <p className="announcement-error">{announcementError}</p> : null}
+                 <button type="button" className="btn btn-primary" onClick={handleAnnouncementSubmit} disabled={creatingAnnouncement}>
+                   {creatingAnnouncement ? 'Publishing...' : 'Publish Announcement'}
+                 </button>
+
+                 <div className="announcement-admin-list">
+                   {districtAnnouncements.map((item) => (
+                     <div key={item.id} className="announcement-admin-item">
+                       <div>
+                         <div className="announcement-admin-item-head">
+                           <strong>{item.title}</strong>
+                           <span>{item.priority}</span>
+                         </div>
+                         <p>{item.message}</p>
+                         <small>{item.ward || item.district} | expires {new Date(item.expiresAt).toLocaleString()}</small>
+                       </div>
+                       <button
+                         type="button"
+                         className="announcement-delete-btn"
+                         onClick={() => handleAnnouncementDelete(item.id)}
+                         title="Remove announcement"
+                       >
+                         <Trash2 size={14} />
+                       </button>
+                     </div>
+                   ))}
                  </div>
                </div>
                

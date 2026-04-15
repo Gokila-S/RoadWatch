@@ -172,6 +172,7 @@ const Header = () => {
       { path: '/reports', label: 'All Reports' },
       { path: '/analytics', label: 'Analytics' },
     ] : [
+      { path: '/announcements', label: 'Announcements' },
       { path: '/dashboard', label: 'My Reports' },
       { path: '/report', label: 'Report Issue' },
     ]
