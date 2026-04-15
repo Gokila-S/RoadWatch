@@ -250,6 +250,12 @@ const ISSUE_CATEGORIES = [
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'
 
+const extractWardFromAddress = (address) => {
+  if (typeof address !== 'string') return ''
+  const firstPart = address.split(',')[0]?.trim()
+  return firstPart || ''
+}
+
 const getPersistedAuth = () => {
   const token = localStorage.getItem('rw_token')
   const userRaw = localStorage.getItem('rw_user')
@@ -449,7 +455,15 @@ const useStore = create((set, get) => ({
   logout: () => {
     localStorage.removeItem('rw_token')
     localStorage.removeItem('rw_user')
-    set({ user: null, token: null, isAuthenticated: false, userRole: null, authError: null, districtAdmins: [] })
+    set({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      userRole: null,
+      authError: null,
+      districtAdmins: [],
+      announcements: [],
+    })
   },
 
   // Reports
@@ -459,11 +473,15 @@ const useStore = create((set, get) => ({
   filterSeverity: 'all',
   filterDistrict: 'all',
   reportsLoading: false,
+  announcements: [],
+  announcementFilter: 'all',
+  announcementsLoading: false,
 
   setSelectedReport: (report) => set({ selectedReport: report }),
   setFilterStatus: (status) => set({ filterStatus: status }),
   setFilterSeverity: (severity) => set({ filterSeverity: severity }),
   setFilterDistrict: (district) => set({ filterDistrict: district }),
+  setAnnouncementFilter: (category) => set({ announcementFilter: category }),
 
   fetchReports: async (query = {}) => {
     const token = get().token
@@ -495,6 +513,114 @@ const useStore = create((set, get) => ({
     return data.reports || []
   },
 
+  fetchAnnouncements: async (query = {}) => {
+    const token = get().token
+    if (!token) {
+      set({ announcements: [] })
+      return []
+    }
+
+    set({ announcementsLoading: true })
+
+    const params = new URLSearchParams()
+    Object.entries(query).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.set(key, value)
+      }
+    })
+
+    const response = await fetch(`${API_BASE_URL}/api/announcements${params.toString() ? `?${params.toString()}` : ''}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      set({ announcementsLoading: false })
+      throw new Error(data.message || 'Could not fetch announcements')
+    }
+
+    set({ announcements: data.announcements || [], announcementsLoading: false })
+    return data.announcements || []
+  },
+
+  fetchRelatedAnnouncements: async ({ category, location, district, limit = 3 }) => {
+    const token = get().token
+    if (!token || !category) return []
+
+    const params = new URLSearchParams()
+    params.set('category', category)
+    params.set('limit', String(limit))
+
+    if (location?.lat != null && location?.lng != null) {
+      params.set('lat', String(location.lat))
+      params.set('lng', String(location.lng))
+    }
+
+    if (location?.address) {
+      const ward = extractWardFromAddress(location.address)
+      if (ward) {
+        params.set('ward', ward)
+      }
+    }
+
+    if (district) {
+      params.set('district', district)
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/announcements/related?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not fetch related announcements')
+    }
+
+    return data.announcements || []
+  },
+
+  createAnnouncement: async (payload) => {
+    const token = get().token
+    const response = await fetch(`${API_BASE_URL}/api/announcements`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not create announcement')
+    }
+
+    set((state) => ({
+      announcements: [data.announcement, ...state.announcements],
+    }))
+
+    return data.announcement
+  },
+
+  deleteAnnouncement: async (id) => {
+    const token = get().token
+    const response = await fetch(`${API_BASE_URL}/api/announcements/${id}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not delete announcement')
+    }
+
+    set((state) => ({
+      announcements: state.announcements.filter((item) => item.id !== id),
+    }))
+  },
+
   getFilteredReports: () => {
     const { reports, filterStatus, filterSeverity, filterDistrict } = get()
     return reports.filter(r => {
@@ -522,7 +648,10 @@ const useStore = create((set, get) => ({
     }
 
     set((state) => ({ reports: [data.report, ...state.reports] }))
-    return data.report
+    return {
+      report: data.report,
+      relatedAnnouncements: data.relatedAnnouncements || [],
+    }
   },
 
   uploadReportMedia: async (file) => {

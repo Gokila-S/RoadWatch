@@ -24,7 +24,7 @@ const Login = () => {
   useEffect(() => {
     if (!isAuthenticated) return
 
-    if (userRole === 'citizen') navigate('/dashboard')
+    if (userRole === 'citizen') navigate('/announcements')
     if (userRole === 'district_admin') navigate('/admin/district')
     if (userRole === 'super_admin') navigate('/admin/super')
   }, [isAuthenticated, userRole, navigate])
@@ -36,7 +36,9 @@ const Login = () => {
 
     try {
       const result = await login(email, password)
-      navigate(result.route)
+      if (result?.route && result.route !== '/dashboard') {
+        navigate(result.route)
+      }
     } catch (err) {
       setError(err.message || 'Unable to login')
     }
@@ -140,7 +142,7 @@ const Login = () => {
                 <button type="submit" className="btn btn-primary btn-lg w-full mt-4" disabled={authLoading || !email || !password}>
                   {authLoading ? 'Signing in...' : 'Sign In'}
                 </button>
-                <p className="text-dim text-mono login-hint">Role is resolved from your account profile after login.</p>
+                <p className="text-dim text-mono login-hint">Citizens are redirected to district announcements immediately after login.</p>
               </form>
             ) : (
               <form onSubmit={handleCitizenSignup} className="login-form">

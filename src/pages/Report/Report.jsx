@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Camera, MapPin, CheckCircle2, ChevronRight, AlertTriangle, CloudRain, Construction, MapPinOff, ScanSearch } from 'lucide-react'
+import { Camera, MapPin, CheckCircle2, ChevronRight, AlertTriangle, CloudRain, Construction, MapPinOff, ScanSearch, BellRing } from 'lucide-react'
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
 import './Report.css'
@@ -11,7 +11,7 @@ const MIN_CATEGORY_CONFIDENCE = 60
 
 const Report = () => {
   const navigate = useNavigate()
-  const { createReport, uploadReportMedia } = useStore()
+  const { createReport, uploadReportMedia, fetchRelatedAnnouncements } = useStore()
   const [step, setStep] = useState(1) // 1: Camera Focus, 2: Details Focus, 3: Success
   const [image, setImage] = useState(null)
   const [imageFile, setImageFile] = useState(null)
@@ -26,6 +26,8 @@ const Report = () => {
   const [locationError, setLocationError] = useState('')
   const [cameraError, setCameraError] = useState('')
   const [cameraReady, setCameraReady] = useState(false)
+  const [relatedAnnouncements, setRelatedAnnouncements] = useState([])
+  const [checkingRelatedAnnouncements, setCheckingRelatedAnnouncements] = useState(false)
   const cameraInputRef = useRef(null)
   const galleryInputRef = useRef(null)
   const videoRef = useRef(null)
@@ -401,6 +403,30 @@ const Report = () => {
     return () => clearTimeout(timer)
   }, [step, imageFile, formData.category, roadImageScore])
 
+  useEffect(() => {
+    if (!formData.category || !locationReady || step !== 2) {
+      setRelatedAnnouncements([])
+      return
+    }
+
+    setCheckingRelatedAnnouncements(true)
+
+    fetchRelatedAnnouncements({
+      category: formData.category,
+      location,
+      limit: 3,
+    })
+      .then((items) => {
+        setRelatedAnnouncements(items)
+      })
+      .catch(() => {
+        setRelatedAnnouncements([])
+      })
+      .finally(() => {
+        setCheckingRelatedAnnouncements(false)
+      })
+  }, [fetchRelatedAnnouncements, formData.category, location, locationReady, step])
+
   const handleSubmit = async () => {
     setSubmitError('')
 
@@ -429,7 +455,7 @@ const Report = () => {
     try {
       const uploadedImageUrl = await uploadReportMedia(imageFile)
 
-      const report = await createReport({
+      const response = await createReport({
         title: formData.title.trim(),
         description: formData.description || 'Citizen submitted report',
         category: formData.category,
@@ -438,6 +464,11 @@ const Report = () => {
         images: uploadedImageUrl ? [uploadedImageUrl] : [],
         aiConfidence: aiData?.confidence || 80,
       })
+
+      const report = response.report
+      if ((response.relatedAnnouncements || []).length > 0) {
+        setRelatedAnnouncements(response.relatedAnnouncements)
+      }
 
       setCreatedReportId(report.id)
       setStep(3)
@@ -718,6 +749,30 @@ const Report = () => {
                        value={formData.description}
                        onChange={e => setFormData({...formData, description: e.target.value})}
                      ></textarea>
+                   </div>
+
+                   <div className="report-announcement-check-block">
+                     <div className="report-announcement-check-head">
+                       <BellRing size={16} />
+                       <span>Related Area Announcements</span>
+                     </div>
+                     {checkingRelatedAnnouncements ? (
+                       <p className="report-announcement-check-note">Checking for nearby alerts and maintenance updates...</p>
+                     ) : relatedAnnouncements.length > 0 ? (
+                       <div className="report-announcement-list">
+                         {relatedAnnouncements.map((item) => (
+                           <div key={item.id} className="report-announcement-item">
+                             <div className="report-announcement-item-head">
+                               <strong>{item.title}</strong>
+                               <span className={`report-announcement-priority ${item.priority}`}>{item.priority}</span>
+                             </div>
+                             <p>{item.message}</p>
+                           </div>
+                         ))}
+                       </div>
+                     ) : (
+                       <p className="report-announcement-check-note">No matching active announcements found for this issue type and location.</p>
+                     )}
                    </div>
                  </div>
 

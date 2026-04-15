@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import Header from './components/Header/Header'
 import Landing from './pages/Landing/Landing'
 import Login from './pages/Login/Login'
+import Announcements from './pages/Announcements/Announcements'
 import Report from './pages/Report/Report'
 import ReportTracker from './pages/Report/ReportTracker'
 import Dashboard from './pages/Dashboard/Dashboard'
@@ -28,7 +29,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 }
 
 function App() {
-  const { fetchCurrentUser, fetchReports, fetchAnalytics, fetchDistrictAdmins, token } = useStore()
+  const { fetchCurrentUser, fetchReports, fetchAnalytics, fetchDistrictAdmins, fetchAnnouncements, token } = useStore()
 
   useEffect(() => {
     if (!token) return
@@ -36,6 +37,7 @@ function App() {
     const bootstrap = async () => {
       const currentUser = await fetchCurrentUser()
       await fetchReports()
+      await fetchAnnouncements()
 
       if (['district_admin', 'super_admin'].includes(currentUser?.role)) {
         await fetchAnalytics()
@@ -49,7 +51,7 @@ function App() {
     bootstrap().catch((error) => {
       console.error('Failed to bootstrap app data', error)
     })
-  }, [token, fetchCurrentUser, fetchReports, fetchAnalytics, fetchDistrictAdmins])
+  }, [token, fetchCurrentUser, fetchReports, fetchAnalytics, fetchDistrictAdmins, fetchAnnouncements])
 
   return (
     <div className="app">
@@ -67,6 +69,14 @@ function App() {
                 <Report />
               </ProtectedRoute>
             }
+          />
+          <Route 
+            path="/announcements" 
+            element={
+              <ProtectedRoute allowedRoles={['citizen']}>
+                <Announcements />
+              </ProtectedRoute>
+            } 
           />
           <Route 
             path="/report/:id" 

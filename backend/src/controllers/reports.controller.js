@@ -25,6 +25,18 @@ const mapReportRow = (row) => ({
   slaDeadline: row.sla_deadline,
 })
 
+const mapAnnouncementRow = (row) => ({
+  id: row.id,
+  title: row.title,
+  message: row.message,
+  category: row.category,
+  priority: row.priority,
+  district: row.district,
+  ward: row.ward,
+  startsAt: row.starts_at,
+  expiresAt: row.expires_at,
+})
+
 const toRadians = (value) => (value * Math.PI) / 180
 
 const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
@@ -217,9 +229,35 @@ export const createReport = async (req, res, next) => {
     await client.query('COMMIT')
     inTransaction = false
 
+    const relatedAnnouncementsResult = await pool.query(
+      `
+      SELECT id, title, message, category, priority, district, ward, starts_at, expires_at
+      FROM announcements
+      WHERE is_published = TRUE
+        AND starts_at <= NOW()
+        AND expires_at > NOW()
+        AND district = $1
+        AND (
+          cardinality(report_categories) = 0
+          OR $2 = ANY(report_categories)
+          OR category = 'alert'
+        )
+      ORDER BY
+        CASE priority
+          WHEN 'critical' THEN 1
+          WHEN 'high' THEN 2
+          ELSE 3
+        END,
+        starts_at DESC
+      LIMIT 3
+      `,
+      [district, category],
+    )
+
     return res.status(201).json({
       message: 'Report created successfully',
       report: mapReportRow({ ...report, reporter_name: reporter.rows[0]?.full_name || 'Citizen' }),
+      relatedAnnouncements: relatedAnnouncementsResult.rows.map(mapAnnouncementRow),
     })
   } catch (error) {
     if (client && inTransaction) {
