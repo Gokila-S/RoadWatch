@@ -165,10 +165,12 @@ const Header = () => {
   const navLinks = isAuthenticated ? (
     userRole === 'super_admin' ? [
       { path: '/admin/super', label: 'Super Admin' },
+      { path: '/admin/announcements', label: 'Announcements' },
       { path: '/reports', label: 'All Reports' },
       { path: '/analytics', label: 'Analytics' },
     ] : userRole === 'district_admin' ? [
       { path: '/admin/district', label: 'Command Center' },
+      { path: '/admin/announcements', label: 'Announcements' },
       { path: '/reports', label: 'All Reports' },
       { path: '/analytics', label: 'Analytics' },
     ] : [

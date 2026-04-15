@@ -106,6 +106,69 @@ const reportsSeed = [
   },
 ]
 
+const announcementsSeed = [
+  {
+    title: 'Emergency patchwork at Gandhipuram Junction',
+    message: 'Traffic diversion active 7:00 PM to 11:00 PM due to urgent pothole patching. Please use Cross Cut Road.',
+    category: 'alert',
+    priority: 'critical',
+    district: 'Coimbatore',
+    ward: 'Gandhipuram',
+    report_categories: ['pothole', 'hazard'],
+    admin_email: 'rajesh@roadwatch.gov',
+    starts_in_hours: -2,
+    expires_in_hours: 10,
+  },
+  {
+    title: 'Perundurai drainage maintenance schedule',
+    message: 'Drain desilting in Perundurai corridor from 6:00 AM tomorrow. Temporary water stagnation may occur during cleanup.',
+    category: 'maintenance',
+    priority: 'high',
+    district: 'Erode',
+    ward: 'Perundurai Road',
+    report_categories: ['waterlogging'],
+    admin_email: 'sunita@roadwatch.gov',
+    starts_in_hours: -1,
+    expires_in_hours: 40,
+  },
+  {
+    title: 'Tiruppur old bus stand hazard advisory',
+    message: 'Broken utility cover near Old Bus Stand is barricaded. Two-wheelers are advised to keep left lane only.',
+    category: 'alert',
+    priority: 'critical',
+    district: 'Tiruppur',
+    ward: 'Old Bus Stand Road',
+    report_categories: ['hazard'],
+    admin_email: 'salim@roadwatch.gov',
+    starts_in_hours: -1,
+    expires_in_hours: 18,
+  },
+  {
+    title: 'Salem Hasthampatti resurfacing update',
+    message: 'Road resurfacing is planned for Hasthampatti this weekend. Expect controlled one-side traffic between 9 AM and 5 PM.',
+    category: 'update',
+    priority: 'normal',
+    district: 'Salem',
+    ward: 'Hasthampatti',
+    report_categories: ['crack', 'pothole'],
+    admin_email: 'preethi@roadwatch.gov',
+    starts_in_hours: 4,
+    expires_in_hours: 52,
+  },
+  {
+    title: 'Trichy Srirangam approach lane restoration',
+    message: 'Final quality checks for Srirangam approach restoration are in progress. Night-time slowdowns expected for 2 days.',
+    category: 'update',
+    priority: 'high',
+    district: 'Trichy',
+    ward: 'Srirangam Approach',
+    report_categories: ['pothole', 'erosion'],
+    admin_email: 'ganesh@roadwatch.gov',
+    starts_in_hours: -3,
+    expires_in_hours: 30,
+  },
+]
+
 const ensureUser = async (client, user, role) => {
   const passwordHash = await bcrypt.hash(user.password, 12)
   const normalizedEmail = user.email.trim().toLowerCase()
@@ -238,8 +301,90 @@ export const seedCoreData = async () => {
       [SUPPORTED_DISTRICTS],
     )
 
+    for (const announcement of announcementsSeed) {
+      const createdBy = adminMap.get(announcement.admin_email)
+      if (!createdBy) continue
+
+      const updateResult = await client.query(
+        `
+        UPDATE announcements
+        SET
+          message = $2,
+          category = $3,
+          priority = $4,
+          ward = $6,
+          report_categories = $7::text[],
+          starts_at = NOW() + ($8 || ' hour')::interval,
+          expires_at = NOW() + ($9 || ' hour')::interval,
+          is_published = TRUE,
+          updated_at = NOW()
+        WHERE title = $1
+          AND district = $5
+          AND created_by = $10
+        `,
+        [
+          announcement.title,
+          announcement.message,
+          announcement.category,
+          announcement.priority,
+          announcement.district,
+          announcement.ward,
+          announcement.report_categories,
+          String(announcement.starts_in_hours),
+          String(announcement.expires_in_hours),
+          createdBy,
+        ],
+      )
+
+      if (updateResult.rowCount > 0) {
+        continue
+      }
+
+      await client.query(
+        `
+        INSERT INTO announcements (
+          title,
+          message,
+          category,
+          priority,
+          district,
+          ward,
+          report_categories,
+          starts_at,
+          expires_at,
+          is_published,
+          created_by
+        )
+        SELECT
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
+          $7::text[],
+          NOW() + ($8 || ' hour')::interval,
+          NOW() + ($9 || ' hour')::interval,
+          TRUE,
+          $10
+        `,
+        [
+          announcement.title,
+          announcement.message,
+          announcement.category,
+          announcement.priority,
+          announcement.district,
+          announcement.ward,
+          announcement.report_categories,
+          String(announcement.starts_in_hours),
+          String(announcement.expires_in_hours),
+          createdBy,
+        ],
+      )
+    }
+
     await client.query('COMMIT')
-    console.log('Seeded core data: 5 district admins, 8 citizens, 10 reports')
+    console.log('Seeded core data: 5 district admins, 8 citizens, 10 reports, 5 announcements')
   } catch (error) {
     await client.query('ROLLBACK')
     throw error

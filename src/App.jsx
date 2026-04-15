@@ -8,6 +8,7 @@ import Report from './pages/Report/Report'
 import ReportTracker from './pages/Report/ReportTracker'
 import Dashboard from './pages/Dashboard/Dashboard'
 import Admin from './pages/Admin/Admin'
+import AdminAnnouncements from './pages/AdminAnnouncements/AdminAnnouncements'
 import SuperAdmin from './pages/SuperAdmin/SuperAdmin'
 import ReportsList from './pages/ReportsList/ReportsList'
 import Analytics from './pages/Analytics/Analytics'
@@ -103,6 +104,14 @@ function App() {
                 <Admin />
               </ProtectedRoute>
             } 
+          />
+          <Route
+            path="/admin/announcements"
+            element={
+              <ProtectedRoute allowedRoles={['district_admin', 'super_admin']}>
+                <AdminAnnouncements />
+              </ProtectedRoute>
+            }
           />
           <Route 
             path="/admin/super" 
