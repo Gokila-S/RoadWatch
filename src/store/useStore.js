@@ -522,25 +522,28 @@ const useStore = create((set, get) => ({
 
     set({ announcementsLoading: true })
 
-    const params = new URLSearchParams()
-    Object.entries(query).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.set(key, value)
+    try {
+      const params = new URLSearchParams()
+      Object.entries(query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.set(key, value)
+        }
+      })
+
+      const response = await fetch(`${API_BASE_URL}/api/announcements${params.toString() ? `?${params.toString()}` : ''}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.message || 'Could not fetch announcements')
       }
-    })
 
-    const response = await fetch(`${API_BASE_URL}/api/announcements${params.toString() ? `?${params.toString()}` : ''}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    const data = await response.json()
-    if (!response.ok) {
+      set({ announcements: data.announcements || [] })
+      return data.announcements || []
+    } finally {
       set({ announcementsLoading: false })
-      throw new Error(data.message || 'Could not fetch announcements')
     }
-
-    set({ announcements: data.announcements || [], announcementsLoading: false })
-    return data.announcements || []
   },
 
   fetchRelatedAnnouncements: async ({ category, location, district, limit = 3 }) => {
