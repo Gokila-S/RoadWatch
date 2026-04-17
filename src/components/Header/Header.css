@@ -6,14 +6,18 @@
   z-index: var(--z-header);
   padding: var(--space-md) 0;
   transition: all var(--transition-medium);
+  background: rgba(10, 10, 12, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .header-scrolled {
-  background: rgba(10, 10, 12, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(10, 10, 12, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border-bottom: 1px solid var(--border-dim);
   padding: var(--space-sm) 0;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
 .header-inner {
@@ -23,7 +27,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-xl);
+  gap: var(--space-lg);
 }
 
 /* Logo */
@@ -80,6 +84,7 @@
   color: var(--text-secondary);
   transition: color var(--transition-fast);
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .nav-link:hover {
@@ -105,6 +110,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  flex-shrink: 0;
 }
 
 .header-icon-btn {
@@ -117,6 +123,9 @@
   border-radius: var(--radius-md);
   color: var(--text-secondary);
   transition: all var(--transition-fast);
+  border: none;
+  background: none;
+  cursor: pointer;
 }
 
 .header-icon-btn:hover {
@@ -139,6 +148,7 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-mono);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
 }
 
 /* Notification Dropdown */
@@ -150,10 +160,12 @@
   position: absolute;
   top: calc(100% + 12px);
   right: 0;
-  width: 380px;
+  width: 400px;
   padding: 0;
   overflow: hidden;
   z-index: var(--z-modal);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl), 0 0 60px rgba(0, 0, 0, 0.35);
 }
 
 .notif-header {
@@ -165,7 +177,7 @@
 }
 
 .notif-list {
-  max-height: 360px;
+  max-height: 380px;
   overflow-y: auto;
 }
 
@@ -178,31 +190,68 @@
   border-bottom: 1px solid var(--border-dim);
 }
 
+.notif-item:last-child {
+  border-bottom: none;
+}
+
 .notif-item:hover {
   background: rgba(255,255,255,0.03);
 }
 
+.notif-item-action {
+  cursor: pointer;
+}
+
+.notif-item-action:hover {
+  background: rgba(245, 158, 11, 0.04);
+}
+
 .notif-unread {
-  background: rgba(245, 158, 11, 0.03);
-  border-left: 2px solid var(--amber);
+  background: rgba(245, 158, 11, 0.04);
+  border-left: 3px solid var(--amber);
 }
 
 .notif-icon-wrap {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1rem;
   flex-shrink: 0;
-  background: var(--bg-tertiary);
+}
+
+/* Notification type colors */
+.notif-alert {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+
+.notif-update {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+}
+
+.notif-status {
+  background: rgba(168, 85, 247, 0.12);
+  color: #c084fc;
+}
+
+.notif-resolved {
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+.notif-content {
+  flex: 1;
+  min-width: 0;
 }
 
 .notif-content p {
   font-size: 0.82rem;
   color: var(--text-secondary);
   line-height: 1.5;
+  margin: 0;
 }
 
 .notif-time {
@@ -223,10 +272,13 @@
   transition: all var(--transition-fast);
   background: var(--bg-tertiary);
   border: 1px solid var(--border-dim);
+  cursor: pointer;
+  color: inherit;
 }
 
 .profile-btn:hover {
   border-color: var(--border-subtle);
+  background: var(--bg-surface);
 }
 
 .profile-avatar {
@@ -253,6 +305,10 @@
   font-size: 0.82rem;
   font-weight: 500;
   color: var(--text-secondary);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-dropdown {
@@ -262,6 +318,8 @@
   width: 280px;
   padding: var(--space-md);
   z-index: var(--z-modal);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
 }
 
 .profile-info {
@@ -292,6 +350,9 @@
   font-size: 0.85rem;
   color: var(--text-secondary);
   transition: all var(--transition-fast);
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
 .profile-option:hover {
@@ -306,6 +367,10 @@
   height: 40px;
   align-items: center;
   justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
 }
 
 .hamburger {
@@ -335,6 +400,7 @@
   transform: translateY(-7px) rotate(-45deg);
 }
 
+/* ── Mobile Responsive ── */
 @media (max-width: 768px) {
   .mobile-menu-btn {
     display: flex;
@@ -345,18 +411,40 @@
     top: 60px;
     left: 0;
     right: 0;
-    background: rgba(10, 10, 12, 0.95);
-    backdrop-filter: blur(20px);
+    bottom: 0;
+    background: rgba(10, 10, 12, 0.97);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
     flex-direction: column;
-    padding: var(--space-lg);
+    padding: var(--space-xl) var(--space-lg);
     gap: var(--space-xs);
     border-bottom: 1px solid var(--border-dim);
     transform: translateY(-120%);
-    transition: transform var(--transition-medium);
+    opacity: 0;
+    transition: transform var(--transition-medium), opacity var(--transition-medium);
+    z-index: 9999;
+    overflow-y: auto;
   }
 
   .nav-open {
     transform: translateY(0);
+    opacity: 1;
+  }
+
+  .nav-link {
+    padding: var(--space-md) var(--space-sm);
+    font-size: 1rem;
+    border-bottom: 1px solid var(--border-dim);
+      width: 100%;
+  }
+
+  .nav-indicator {
+    left: 0;
+    right: auto;
+    width: 3px;
+    height: 100%;
+    top: 0;
+    bottom: 0;
   }
 
   .profile-name {
@@ -367,11 +455,31 @@
     position: fixed;
     top: 60px;
     right: var(--space-md);
+    left: var(--space-md);
+    width: auto;
+    max-width: none;
+  }
+
+  .profile-dropdown {
+    position: fixed;
+    top: 60px;
+    right: var(--space-md);
     width: calc(100vw - 32px);
-    max-width: 380px;
+    max-width: 320px;
   }
 }
 
+@media (max-width: 480px) {
+  .header-inner {
+    padding: 0 var(--space-md);
+  }
+
+  .logo-tag {
+    display: none;
+  }
+}
+
+/* ── Admin Navbar Profile ── */
 .admin-navbar-profile {
   display: flex;
   align-items: center;
