@@ -4,7 +4,7 @@ dotenv.config()
 
 export const env = {
   port: Number(process.env.PORT || 4000),
-  frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
+  frontendOrigin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173,http://localhost:5174',
   databaseUrl: process.env.DATABASE_URL,
   supabaseUrl: process.env.SUPABASE_URL,
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,

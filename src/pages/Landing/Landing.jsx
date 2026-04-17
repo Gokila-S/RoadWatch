@@ -94,8 +94,8 @@ const Landing = () => {
         <div className="hero-map-bg">
           <MapView
             reports={reports}
-            center={[12.9716, 77.5946]}
-            zoom={12}
+            center={[11.15, 77.65]}
+            zoom={9}
             interactive={false}
             height="100%"
             className="hero-map"

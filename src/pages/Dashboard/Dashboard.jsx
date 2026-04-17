@@ -112,7 +112,7 @@ const Dashboard = () => {
       return [firstGeoReport.location.lat, firstGeoReport.location.lng]
     }
 
-    return [12.9716, 77.5946]
+    return [11.15, 77.65]
   }, [userLocation, activeReports])
 
   const mapReports = useMemo(() => {

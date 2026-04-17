@@ -655,10 +655,10 @@ const Report = () => {
                     {/* Rendered Map Background Style */}
                     <div className="absolute right-0 top-0 bottom-0 w-1/3 opacity-30 select-none pointer-events-none fade-left">
                        <MapView
-                         center={[location.lat || 12.9716, location.lng || 77.5946]}
+                         center={[location.lat || 11.15, location.lng || 77.65]}
                          zoom={14}
                          interactive={false}
-                         reports={[{ id: '1', location: { ...location, lat: location.lat || 12.9716, lng: location.lng || 77.5946 }, severity: formData.severity || 'medium' }]}
+                         reports={[{ id: '1', location: { ...location, lat: location.lat || 11.15, lng: location.lng || 77.65 }, severity: formData.severity || 'medium' }]}
                        />
                     </div>
                  </div>
@@ -703,10 +703,11 @@ const Report = () => {
                           className={`
                             flex flex-col items-center justify-center gap-3 p-4 rounded-xl border transition-all
                             ${formData.category === cat.id 
-                              ? 'border-amber bg-amber/10 text-amber shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-1 ring-amber/50' 
-                              : 'border-subtle bg-primary text-secondary hover:border-medium hover:bg-surface hover:text-white'}
-                            ${(!roadValidationPassed || roadScanChecking) ? 'opacity-55 cursor-not-allowed pointer-events-none' : ''}
+                              ? 'border-amber bg-amber/10 text-accent' 
+                              : 'border-subtle bg-primary text-secondary'}
+                            ${(!roadValidationPassed || roadScanChecking) ? 'opacity-55 cursor-not-allowed pointer-events-none' : 'cursor-pointer'}
                           `}
+                          style={formData.category === cat.id ? { boxShadow: '0 0 15px rgba(245,158,11,0.15)', outline: '1px solid rgba(245,158,11,0.5)' } : {}}
                         >
                           {cat.icon}
                           <span className="font-semibold text-sm">{cat.label}</span>
@@ -728,11 +729,12 @@ const Report = () => {
                            type="button"
                            onClick={() => setFormData({ ...formData, severity: severity.id })}
                            className={`
-                            flex items-center justify-center p-3 rounded-xl border transition-all font-semibold text-sm
+                            flex items-center justify-center p-3 rounded-xl border transition-all font-semibold text-sm cursor-pointer
                             ${formData.severity === severity.id
-                              ? 'border-amber bg-amber/10 text-amber shadow-[0_0_15px_rgba(245,158,11,0.15)] ring-1 ring-amber/50'
-                              : 'border-subtle bg-primary text-secondary hover:border-medium hover:bg-surface hover:text-white'}
+                              ? 'border-amber bg-amber/10 text-accent'
+                              : 'border-subtle bg-primary text-secondary'}
                            `}
+                           style={formData.severity === severity.id ? { boxShadow: '0 0 15px rgba(245,158,11,0.15)', outline: '1px solid rgba(245,158,11,0.5)' } : {}}
                          >
                            {severity.label}
                          </button>

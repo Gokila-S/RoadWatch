@@ -74,7 +74,7 @@ const FitBoundary = ({ boundary = null, enabled = false, padding = [28, 28] }) =
 
 const MapView = ({
   reports = [],
-  center = [12.9716, 77.5946],
+  center = [11.15, 77.65],
   zoom = 12,
   height = '100%',
   onMarkerClick,
