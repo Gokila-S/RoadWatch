@@ -1,24 +1,25 @@
 import './StatusBadge.css'
 
+/* ─── Constant color definitions ─── */
 const STATUS_CONFIG = {
-  pending: { label: 'Pending', className: 'badge-pending' },
-  verified: { label: 'Verified', className: 'badge-verified' },
-  assigned: { label: 'Assigned', className: 'badge-assigned' },
-  resolved: { label: 'Resolved', className: 'badge-resolved' },
+  pending:  { label: 'Pending',  className: 'badge-pending',  dotColor: '#f59e0b' },
+  verified: { label: 'Verified', className: 'badge-verified', dotColor: '#3b82f6' },
+  assigned: { label: 'Assigned', className: 'badge-assigned', dotColor: '#a855f7' },
+  resolved: { label: 'Resolved', className: 'badge-resolved', dotColor: '#22c55e' },
 }
 
 const SEVERITY_CONFIG = {
   critical: { label: 'Critical', className: 'badge-critical' },
-  high: { label: 'High', className: 'severity-high' },
-  medium: { label: 'Medium', className: 'severity-medium' },
-  low: { label: 'Low', className: 'severity-low' },
+  high:     { label: 'High',     className: 'severity-high' },
+  medium:   { label: 'Medium',   className: 'severity-medium' },
+  low:      { label: 'Low',      className: 'severity-low' },
 }
 
 export const StatusBadge = ({ status }) => {
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.pending
   return (
     <span className={`badge ${config.className}`}>
-      <span className="badge-dot"></span>
+      <span className="badge-dot" style={{ backgroundColor: config.dotColor }}></span>
       {config.label}
     </span>
   )

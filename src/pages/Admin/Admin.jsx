@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   ChevronLeft, Search, Filter, Clock, MapPin as MapPinIcon, 
-  AlertTriangle, CheckCircle2, XCircle, HardHat, AlertOctagon, ScanSearch, Droplets, Construction
+  AlertTriangle, CheckCircle2, XCircle, HardHat, AlertOctagon, ScanSearch, Droplets, Construction,
+  ChevronDown, X
 } from 'lucide-react'
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
@@ -14,6 +16,13 @@ const CATEGORY_CONFIG = {
   waterlogging: { label: 'Waterlogging', icon: Droplets },
   hazard: { label: 'Hazard', icon: AlertOctagon },
   crack: { label: 'Road Crack', icon: Construction },
+}
+
+const STATUS_COLORS = {
+  pending: '#f59e0b',
+  verified: '#3b82f6',
+  assigned: '#a855f7',
+  resolved: '#22c55e',
 }
 
 const DISTRICT_BOUNDARIES = {
@@ -62,10 +71,29 @@ const Admin = () => {
   } = useStore()
   
   const [selectedReport, setSelectedReport] = useState(null)
-  const [assigningId, setAssigningId] = useState(null) // ID of report being assigned
+  const [assigningId, setAssigningId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [bulkMode, setBulkMode] = useState(false)
   const [filterCategory, setFilterCategory] = useState('all')
+  const [showFilters, setShowFilters] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // Read URL search params on mount (from notifications)
+  useEffect(() => {
+    const statusParam = searchParams.get('status')
+    const severityParam = searchParams.get('severity')
+    if (statusParam && ['pending', 'verified', 'assigned', 'resolved'].includes(statusParam)) {
+      setFilterStatus(statusParam)
+      setShowFilters(true)
+    }
+    if (severityParam && ['critical', 'high', 'medium', 'low'].includes(severityParam)) {
+      setFilterSeverity(severityParam)
+      setShowFilters(true)
+    }
+    // Clean up the URL after reading
+    if (statusParam || severityParam) {
+      setSearchParams({}, { replace: true })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchReports().catch((error) => {
@@ -88,8 +116,19 @@ const Admin = () => {
   })
 
   const pendingCount = adminReports.filter(r => r.status === 'pending').length
+  const verifiedCount = adminReports.filter(r => r.status === 'verified').length
+  const assignedCount = adminReports.filter(r => r.status === 'assigned').length
   const criticalCount = adminReports.filter(r => r.severity === 'critical' && r.status !== 'resolved').length
   const districtBoundary = user?.district ? DISTRICT_BOUNDARIES[user.district] : null
+
+  const activeFilterCount = [filterStatus, filterSeverity, filterCategory].filter(f => f !== 'all').length
+
+  const clearAllFilters = () => {
+    setFilterStatus('all')
+    setFilterSeverity('all')
+    setFilterCategory('all')
+    setSearchQuery('')
+  }
 
   const handleAction = async (status, note = '') => {
     if (selectedReport) {
@@ -105,7 +144,7 @@ const Admin = () => {
 
   const getSLAStatus = (deadlineStr) => {
     const deadline = new Date(deadlineStr)
-    const now = new Date('2026-04-03T09:00:00Z') // Contextual mock current time
+    const now = new Date()
     const diffHours = (deadline - now) / (1000 * 60 * 60)
     
     if (diffHours < 0) return { text: "DEADLINE BREACHED", class: "sla-critical text-xs px-2 py-1 rounded font-mono font-bold" }
@@ -117,10 +156,8 @@ const Admin = () => {
     <div className="admin-command-center">
 
       <div className="command-workspace">
-        {/* 🗺️ LIVE MAP (70%) */}
+        {/* 🗺️ LIVE MAP */}
         <div className="workspace-map">
-
-
           <MapView 
             reports={filteredReports} 
             center={user?.role === 'super_admin' ? [11.15, 77.75] : [11.05, 77.65]} 
@@ -134,16 +171,20 @@ const Admin = () => {
           
           {/* FLOATING STATS OVERLAY */}
           <div className="floating-stats-panel">
-            <div className="admin-stat-box">
-              <span className="stat-label">Total Assigned</span>
-              <span className="stat-value" style={{ color: 'var(--accent)' }}>{adminReports.length}</span>
+            <div className="admin-stat-box stat-clickable" onClick={() => { setFilterStatus('pending'); setShowFilters(false) }}>
+              <span className="stat-label">Pending</span>
+              <span className="stat-value" style={{ color: STATUS_COLORS.pending }}>{pendingCount}</span>
             </div>
-            <div className="admin-stat-box">
-              <span className="stat-label">Pending Triage</span>
-              <span className="stat-value" style={{ color: 'var(--amber)' }}>{pendingCount}</span>
+            <div className="admin-stat-box stat-clickable" onClick={() => { setFilterStatus('verified'); setShowFilters(false) }}>
+              <span className="stat-label">Verified</span>
+              <span className="stat-value" style={{ color: STATUS_COLORS.verified }}>{verifiedCount}</span>
             </div>
-            <div className="admin-stat-box alert-box" style={{ borderRight: 'none' }}>
-              <span className="stat-label">Active Critical</span>
+            <div className="admin-stat-box stat-clickable" onClick={() => { setFilterStatus('assigned'); setShowFilters(false) }}>
+              <span className="stat-label">Assigned</span>
+              <span className="stat-value" style={{ color: STATUS_COLORS.assigned }}>{assignedCount}</span>
+            </div>
+            <div className="admin-stat-box alert-box stat-clickable" style={{ borderRight: 'none' }} onClick={() => { setFilterSeverity('critical'); setShowFilters(false) }}>
+              <span className="stat-label" style={{ color: '#f87171' }}>Critical</span>
               <span className="stat-value">{criticalCount}</span>
             </div>
           </div>
@@ -151,60 +192,146 @@ const Admin = () => {
           {/* Radar Scanner Overlay */}
           <div className="radar-overlay pointer-events-none"></div>
           
-          <div style={{ position: 'absolute', bottom: '16px', left: '16px', zIndex: 400, backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', padding: '12px', border: '1px solid var(--border-dim)', borderRadius: '8px', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>
-            <p style={{ color: 'var(--accent)', marginBottom: '8px' }}>CLUSTER DENSITY</p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}><span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'var(--signal-red)' }}></span> Pending (Needs Action)</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}><span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'var(--signal-blue)' }}></span> Verified & Assigned</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: 'var(--signal-green)' }}></span> Resolved Cases</div>
+          {/* Map Legend */}
+          <div className="map-legend">
+            <p className="map-legend-title">CLUSTER DENSITY</p>
+            <div className="map-legend-item"><span className="map-legend-dot" style={{ backgroundColor: STATUS_COLORS.pending }}></span> Pending</div>
+            <div className="map-legend-item"><span className="map-legend-dot" style={{ backgroundColor: STATUS_COLORS.verified }}></span> Verified</div>
+            <div className="map-legend-item"><span className="map-legend-dot" style={{ backgroundColor: STATUS_COLORS.assigned }}></span> Assigned</div>
+            <div className="map-legend-item"><span className="map-legend-dot" style={{ backgroundColor: STATUS_COLORS.resolved }}></span> Resolved</div>
           </div>
         </div>
 
-        {/* 📋 RIGHT PANEL (30%) */}
+        {/* 📋 RIGHT PANEL */}
         <div className="workspace-panel">
           {!selectedReport ? (
-            // LIST VIEW (Default Control Panel)
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+            // LIST VIEW
+            <div className="panel-list-view">
                
                {/* Search & Filters */}
-               <div className="filter-row">
-                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                   <h2 style={{ fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1rem', margin: 0 }}>
+               <div className="filter-section">
+                 <div className="filter-section-header">
+                   <h2 className="filter-section-title">
                      <Clock size={16} color="var(--amber)" /> Live Incident Feed
                    </h2>
+                   <button 
+                     className={`filter-toggle-btn ${showFilters ? 'active' : ''}`}
+                     onClick={() => setShowFilters(!showFilters)}
+                   >
+                     <Filter size={14} />
+                     Filters
+                     {activeFilterCount > 0 && <span className="filter-count-badge">{activeFilterCount}</span>}
+                   </button>
                  </div>
                  
-                 <div style={{ position: 'relative' }}>
-                   <Search style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} size={16} />
-                   <input type="text" placeholder="Search reports or IDs..." className="search-input" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                 {/* Search */}
+                 <div className="search-wrapper">
+                   <Search className="search-icon" size={16} />
+                   <input 
+                     type="text" 
+                     placeholder="Search by title, ID, or location..." 
+                     className="search-input" 
+                     value={searchQuery} 
+                     onChange={(e) => setSearchQuery(e.target.value)} 
+                   />
+                   {searchQuery && (
+                     <button className="search-clear" onClick={() => setSearchQuery('')}>
+                       <X size={14} />
+                     </button>
+                   )}
                  </div>
                  
-                 <div className="filter-row-controls">
-                   <select className="filter-select" style={{ flex: 1, minWidth: 0 }} value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-                     <option value="all">Status: All</option>
-                     <option value="pending">Pending</option>
-                     <option value="verified">Verified</option>
-                     <option value="assigned">Assigned</option>
-                     <option value="resolved">Resolved</option>
-                   </select>
-                   <select className="filter-select" style={{ flex: 1, minWidth: 0 }} value={filterSeverity} onChange={(e) => setFilterSeverity(e.target.value)}>
-                     <option value="all">Severity: All</option>
-                     <option value="critical">Critical</option>
-                     <option value="high">High</option>
-                     <option value="medium">Medium</option>
-                     <option value="low">Low</option>
-                   </select>
-                   <select className="filter-select" style={{ flex: 1, minWidth: 0 }} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                     <option value="all">Category: All</option>
-                     <option value="pothole">Pothole</option>
-                     <option value="waterlogging">Waterlogging</option>
-                     <option value="hazard">Hazard</option>
-                     <option value="crack">Road Crack</option>
-                   </select>
-                 </div>
+                 {/* Expandable Filter Panel */}
+                 <AnimatePresence>
+                   {showFilters && (
+                     <motion.div 
+                       className="advanced-filters"
+                       initial={{ height: 0, opacity: 0 }}
+                       animate={{ height: 'auto', opacity: 1 }}
+                       exit={{ height: 0, opacity: 0 }}
+                       transition={{ duration: 0.2 }}
+                     >
+                       {/* Status Filter Chips */}
+                       <div className="filter-group">
+                         <label className="filter-group-label">STATUS</label>
+                         <div className="filter-chips">
+                           {[
+                             { id: 'all', label: 'All' },
+                             { id: 'pending', label: 'Pending', color: STATUS_COLORS.pending },
+                             { id: 'verified', label: 'Verified', color: STATUS_COLORS.verified },
+                             { id: 'assigned', label: 'Assigned', color: STATUS_COLORS.assigned },
+                             { id: 'resolved', label: 'Resolved', color: STATUS_COLORS.resolved },
+                           ].map(s => (
+                             <button 
+                               key={s.id}
+                               className={`filter-chip ${filterStatus === s.id ? 'active' : ''}`}
+                               onClick={() => setFilterStatus(s.id)}
+                               style={filterStatus === s.id && s.color ? { borderColor: s.color, color: s.color, backgroundColor: `${s.color}15` } : {}}
+                             >
+                               {s.color && <span className="filter-chip-dot" style={{ backgroundColor: s.color }}></span>}
+                               {s.label}
+                             </button>
+                           ))}
+                         </div>
+                       </div>
+
+                       {/* Severity Filter Chips */}
+                       <div className="filter-group">
+                         <label className="filter-group-label">SEVERITY</label>
+                         <div className="filter-chips">
+                           {[
+                             { id: 'all', label: 'All' },
+                             { id: 'critical', label: 'Critical', color: '#ef4444' },
+                             { id: 'high', label: 'High', color: '#f97316' },
+                             { id: 'medium', label: 'Medium', color: '#f59e0b' },
+                             { id: 'low', label: 'Low', color: '#22c55e' },
+                           ].map(s => (
+                             <button 
+                               key={s.id}
+                               className={`filter-chip ${filterSeverity === s.id ? 'active' : ''}`}
+                               onClick={() => setFilterSeverity(s.id)}
+                               style={filterSeverity === s.id && s.color ? { borderColor: s.color, color: s.color, backgroundColor: `${s.color}15` } : {}}
+                             >
+                               {s.label}
+                             </button>
+                           ))}
+                         </div>
+                       </div>
+
+                       {/* Category Filter Chips */}
+                       <div className="filter-group">
+                         <label className="filter-group-label">CATEGORY</label>
+                         <div className="filter-chips">
+                           {[
+                             { id: 'all', label: 'All' },
+                             { id: 'pothole', label: 'Pothole' },
+                             { id: 'crack', label: 'Crack' },
+                             { id: 'waterlogging', label: 'Waterlogging' },
+                             { id: 'hazard', label: 'Hazard' },
+                           ].map(s => (
+                             <button 
+                               key={s.id}
+                               className={`filter-chip ${filterCategory === s.id ? 'active' : ''}`}
+                               onClick={() => setFilterCategory(s.id)}
+                             >
+                               {s.label}
+                             </button>
+                           ))}
+                         </div>
+                       </div>
+
+                       {activeFilterCount > 0 && (
+                         <button className="clear-all-btn" onClick={clearAllFilters}>
+                           <X size={12} /> Clear all filters
+                         </button>
+                       )}
+                     </motion.div>
+                   )}
+                 </AnimatePresence>
                </div>
 
                {/* Reports List */}
-               <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+               <div className="report-list-scroll">
                  {filteredReports.map(report => {
                    const sla = getSLAStatus(report.slaDeadline)
                    const categoryMeta = CATEGORY_CONFIG[report.category]
@@ -215,9 +342,9 @@ const Admin = () => {
                        className="report-list-item"
                        onClick={() => setSelectedReport(report)}
                      >
-                       <div style={{ width: '64px', height: '64px', borderRadius: '6px', overflow: 'hidden', flexShrink: 0, backgroundColor: '#000' }}>
+                       <div className="report-list-thumb">
                          {hasValidReportImage(report) ? (
-                           <img src={report.images[0]} alt="Issue" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                           <img src={report.images[0]} alt="Issue" className="report-list-thumb-img" />
                          ) : (
                            <div className="admin-report-thumb-fallback" aria-label={`${categoryMeta?.label || 'Report'} image missing`}>
                              <CategoryIcon size={20} />
@@ -226,50 +353,53 @@ const Admin = () => {
                        </div>
                        
                        <div className="list-item-content">
-                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
-                           <p style={{ color: 'var(--accent)', fontSize: '10px', fontFamily: 'var(--font-mono)', lineHeight: 1, letterSpacing: '1px', margin: 0 }}>{report.id}</p>
+                         <div className="list-item-top">
+                           <p className="list-item-id">{report.id}</p>
                            <StatusBadge status={report.status} />
                          </div>
                          <h3 className="list-item-title">{report.title}</h3>
                          <div className="list-item-address">
                            <MapPinIcon size={12} style={{ flexShrink: 0 }} /> {report.location.address}
                          </div>
-                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                         <div className="list-item-bottom">
                             <span className={sla.class}>{sla.text}</span>
-                            <span style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: report.severity === 'critical' ? 'var(--signal-red)' : report.severity === 'high' ? 'var(--amber)' : 'var(--signal-green)', flexShrink: 0 }}>
-                            </span>
+                            <SeverityBadge severity={report.severity} />
                          </div>
                        </div>
                      </div>
                    )
                  })}
                  {filteredReports.length === 0 && (
-                   <div style={{ textAlign: 'center', padding: '32px', color: 'var(--text-dim)', fontSize: '0.875rem' }}>No reports match current filters.</div>
+                   <div className="report-list-empty">
+                     <Filter size={24} />
+                     <p>No reports match current filters.</p>
+                     {activeFilterCount > 0 && <button className="clear-all-btn" onClick={clearAllFilters}>Clear filters</button>}
+                   </div>
                  )}
                </div>
             </div>
           ) : (
-             // DETAIL VIEW (Decision Panel)
+             // DETAIL VIEW
              <AnimatePresence mode="wait">
                <motion.div 
                  key={selectedReport.id}
                  initial={{ opacity: 0, x: 20 }}
                  animate={{ opacity: 1, x: 0 }}
-                 style={{ display: 'flex', flex: 1, flexDirection: 'column', height: '100%', overflow: 'hidden' }}
+                 className="detail-view"
                >
                  {/* Header */}
-                 <div style={{ padding: '16px', borderBottom: '1px solid var(--border-dim)', backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)', position: 'sticky', top: 0, zIndex: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-                   <button onClick={() => setSelectedReport(null)} style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.875rem', fontFamily: 'var(--font-mono)', cursor: 'pointer' }}>
+                 <div className="detail-header">
+                   <button onClick={() => setSelectedReport(null)} className="detail-back-btn">
                      <ChevronLeft size={16} /> BACK TO LIST
                    </button>
-                   <span style={{ color: 'var(--text-dim)', fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>{selectedReport.id}</span>
+                   <span className="detail-id">{selectedReport.id}</span>
                  </div>
                  
-                 <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                 <div className="detail-scroll">
                    {/* Visual Context */}
-                   <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)', minHeight: '200px', height: '200px', flexShrink: 0, backgroundColor: '#000' }}>
+                   <div className="detail-image-block">
                      {hasValidReportImage(selectedReport) ? (
-                       <img src={selectedReport.images[0]} alt="evidence" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.8 }} />
+                       <img src={selectedReport.images[0]} alt="evidence" className="detail-evidence-img" />
                      ) : (
                        <div className="admin-detail-fallback" aria-label={`${CATEGORY_CONFIG[selectedReport.category]?.label || 'Report'} image missing`}>
                          {(() => {
@@ -278,62 +408,62 @@ const Admin = () => {
                          })()}
                        </div>
                      )}
-                     <div style={{ position: 'absolute', top: '8px', right: '8px', display: 'flex', gap: '8px' }}>
+                     <div className="detail-image-badges">
                        <StatusBadge status={selectedReport.status} />
                        <SeverityBadge severity={selectedReport.severity} />
                      </div>
-                     <div style={{ position: 'absolute', bottom: '8px', left: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', padding: '8px', borderRadius: '4px', fontSize: '0.75rem', color: '#fff', display: 'flex', alignItems: 'flex-start', gap: '8px', border: '1px solid var(--border-dim)' }}>
+                     <div className="detail-image-location">
                        <MapPinIcon size={14} color="var(--signal-cyan)" style={{ flexShrink: 0, marginTop: '2px' }} />
-                       <span style={{ lineHeight: 1.4 }}>{selectedReport.location.address} <br/><span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>LAT: {selectedReport.location.lat} LNG: {selectedReport.location.lng}</span></span>
+                       <span>{selectedReport.location.address} <br/><span className="detail-coords">LAT: {selectedReport.location.lat} LNG: {selectedReport.location.lng}</span></span>
                      </div>
                    </div>
                    
                    {/* AI Block */}
-                   <div style={{ backgroundColor: 'rgba(13, 203, 242, 0.05)', border: '1px solid rgba(13, 203, 242, 0.2)', borderRadius: '8px', padding: '16px', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
-                     <AlertOctagon style={{ position: 'absolute', right: '-16px', top: '-16px', color: 'rgba(13, 203, 242, 0.1)' }} size={100} />
-                     <h4 style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--signal-cyan)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                   <div className="detail-ai-block">
+                     <AlertOctagon className="detail-ai-watermark" size={100} />
+                     <h4 className="detail-ai-title">
                        <ScanSearch size={14} /> AI TELEMETRY
                      </h4>
-                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', position: 'relative', zIndex: 10 }}>
+                     <div className="detail-ai-content">
                        <div style={{ flexShrink: 0, transform: 'scale(0.85)', transformOrigin: 'left center' }}>
                          <AiConfidenceBadge confidence={selectedReport.aiConfidence} />
                        </div>
-                       <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>Pattern match: <strong style={{ color: '#fff' }}>{selectedReport.category.toUpperCase()}</strong>. Structural degradation severity estimated at {selectedReport.severity.toUpperCase()}.</p>
+                       <p className="detail-ai-summary">Pattern match: <strong style={{ color: '#fff' }}>{selectedReport.category.toUpperCase()}</strong>. Structural degradation severity estimated at {selectedReport.severity.toUpperCase()}.</p>
                      </div>
                    </div>
                    
                    {/* Meta */}
-                   <div style={{ flexShrink: 0 }}>
+                   <div className="detail-meta">
                      <h3 className="text-lg font-semibold mb-2">{selectedReport.title}</h3>
-                     <p className="text-sm text-secondary leading-relaxed bg-tertiary p-4 rounded-lg border border-subtle">
+                     <p className="detail-description">
                        {selectedReport.description || "No supplemental notes provided by citizen."}
                      </p>
                    </div>
                    
-                   <div style={{ flexShrink: 0 }} className="grid grid-cols-2 gap-4">
-                     <div className="bg-tertiary p-3 border border-dim rounded-lg">
-                       <p className="text-[10px] text-dim font-mono mb-1">TIME SINCE REPORTED</p>
-                       <p className="text-sm font-semibold">{Math.floor((new Date() - new Date(selectedReport.createdAt)) / 3600000)} Hours Ago</p>
+                   <div className="detail-stats-grid">
+                     <div className="detail-stat-card">
+                       <p className="detail-stat-label">TIME SINCE REPORTED</p>
+                       <p className="detail-stat-value">{Math.floor((new Date() - new Date(selectedReport.createdAt)) / 3600000)} Hours Ago</p>
                      </div>
-                     <div className="bg-tertiary p-3 border border-dim rounded-lg">
-                       <p className="text-[10px] text-dim font-mono mb-1">SLA DEADLINE</p>
-                       <p className="text-sm font-semibold">
+                     <div className="detail-stat-card">
+                       <p className="detail-stat-label">SLA DEADLINE</p>
+                       <p className="detail-stat-value">
                          <span className={getSLAStatus(selectedReport.slaDeadline).class}>{getSLAStatus(selectedReport.slaDeadline).text}</span>
                        </p>
                      </div>
                    </div>
                  </div>
                  
-                 {/* ⚡ Decision Panel (MOST IMPORTANT) */}
-                 <div className="p-5 border-t border-dim bg-secondary shadow-[0_-10px_30px_rgba(0,0,0,0.5)] z-20 flex-shrink-0">
-                   <p className="text-[10px] text-dim font-mono tracking-widest mb-3">ACTION REQUIRED</p>
+                 {/* ⚡ Decision Panel */}
+                 <div className="decision-panel">
+                   <p className="decision-label">ACTION REQUIRED</p>
                    
                    {selectedReport.status === 'pending' && (
-                     <div className="grid grid-cols-2 gap-3">
-                       <button className="btn btn-secondary border border-signal-blue text-signal-blue hover:bg-signal-blue/10 flex justify-center items-center gap-2" onClick={() => handleAction('verified')}>
-                         <CheckCircle2 size={16} /> Verify
+                     <div className="decision-actions-grid">
+                       <button className="decision-btn decision-btn-verify" onClick={() => handleAction('verified')}>
+                         <CheckCircle2 size={16} /> Verify Report
                        </button>
-                       <button className="btn btn-danger flex justify-center items-center gap-2" onClick={() => handleAction('resolved', 'Rejected - Invalid Report')}>
+                       <button className="decision-btn decision-btn-reject" onClick={() => handleAction('resolved', 'Rejected - Invalid Report')}>
                          <XCircle size={16} /> Reject
                        </button>
                      </div>
@@ -342,28 +472,28 @@ const Admin = () => {
                    {selectedReport.status === 'verified' && (
                      <>
                        {assigningId === selectedReport.id ? (
-                         <div className="space-y-3 bg-tertiary p-3 rounded border border-dim animate-in fade-in slide-in-from-bottom-2">
-                           <select className="w-full bg-secondary border border-dim rounded px-3 py-2 text-sm outline-none">
+                         <div className="assign-form">
+                           <select className="assign-select">
                              <option>Dept of Public Works (Teams A-C)</option>
                              <option>Water & Sewage Board</option>
                              <option>Highway Maintenance</option>
                            </select>
-                           <select className="w-full bg-secondary border border-dim rounded px-3 py-2 text-sm outline-none text-signal-red">
+                           <select className="assign-select" style={{ color: '#f87171' }}>
                              <option>Priority: Standard</option>
                              <option>Priority: URGENT (24h)</option>
                            </select>
-                           <input type="text" placeholder="Add assignment note..." className="w-full bg-secondary border border-dim rounded px-3 py-2 text-sm outline-none focus:border-amber-500" defaultValue="Fix within 24 hours" />
-                           <div className="flex gap-2 pt-1">
+                           <input type="text" placeholder="Add assignment note..." className="assign-input" defaultValue="Fix within 24 hours" />
+                           <div className="assign-form-actions">
                              <button className="btn btn-primary flex-1" onClick={() => handleAction('assigned')}>Confirm Dispatch</button>
-                             <button className="btn border border-dim hover:bg-surface text-secondary" onClick={() => setAssigningId(null)}>Cancel</button>
+                             <button className="decision-btn decision-btn-cancel" onClick={() => setAssigningId(null)}>Cancel</button>
                            </div>
                          </div>
                        ) : (
-                         <div className="grid grid-cols-1 gap-2">
-                           <button className="btn btn-primary flex justify-center items-center gap-2 py-3" onClick={() => setAssigningId(selectedReport.id)}>
+                         <div className="decision-actions-stack">
+                           <button className="btn btn-primary decision-btn-full" onClick={() => setAssigningId(selectedReport.id)}>
                              <HardHat size={16} /> Assign to Worker
                            </button>
-                           <button className="btn bg-surface border border-signal-red/30 text-signal-red hover:bg-signal-red/10 flex justify-center items-center gap-2">
+                           <button className="decision-btn decision-btn-escalate">
                              <AlertTriangle size={16} /> Mark as Critical Priority
                            </button>
                          </div>
@@ -372,27 +502,27 @@ const Admin = () => {
                    )}
                    
                    {selectedReport.status === 'assigned' && (
-                     <div className="space-y-3">
-                       <div className="bg-signal-purple/10 border border-signal-purple/30 p-3 rounded flex items-start gap-3">
-                         <div className="w-8 h-8 rounded-full bg-signal-purple/20 flex items-center justify-center text-signal-purple mt-1"><HardHat size={14} /></div>
+                     <div className="decision-assigned-block">
+                       <div className="assigned-status-card">
+                         <div className="assigned-icon-wrap"><HardHat size={16} /></div>
                          <div>
-                           <p className="text-sm font-semibold text-white">Dispatched to DPW Team A</p>
-                           <p className="text-xs text-secondary mt-1">Awaiting worker resolution confirmation.</p>
+                           <p className="assigned-title">Dispatched to DPW Team A</p>
+                           <p className="assigned-subtitle">Awaiting worker resolution confirmation.</p>
                          </div>
                        </div>
-                       <button className="btn w-full bg-signal-green text-black hover:brightness-110 font-bold flex justify-center items-center gap-2 py-3" onClick={() => handleAction('resolved')}>
-                         <CheckCircle2 size={16} /> Verify & Mark Resolved
+                       <button className="decision-btn decision-btn-resolve" onClick={() => handleAction('resolved')}>
+                         <CheckCircle2 size={18} /> Verify & Mark Resolved
                        </button>
                      </div>
                    )}
                    
                    {selectedReport.status === 'resolved' && (
-                     <div className="bg-signal-green/10 border border-signal-green/30 p-4 rounded-lg flex flex-col items-center justify-center gap-3">
-                       <div className="flex items-center gap-2 text-signal-green">
+                     <div className="resolved-status-card">
+                       <div className="resolved-icon-text">
                          <CheckCircle2 size={24} />
-                         <span className="text-sm font-semibold tracking-wide">Issue Successfully Resolved</span>
+                         <span>Issue Successfully Resolved</span>
                        </div>
-                       <p className="text-xs text-secondary font-mono">Resolution logged in main audit ledger.</p>
+                       <p className="resolved-note">Resolution logged in main audit ledger.</p>
                      </div>
                    )}
                  </div>

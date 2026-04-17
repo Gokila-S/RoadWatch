@@ -1,22 +1,118 @@
+/* ============================================
+   STATUS & SEVERITY BADGES
+   Fixed, constant colors per status
+   ============================================ */
+
+/* Base badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Status: Constant Colors ── */
+
+/* Pending — Amber/Orange */
+.badge-pending {
+  color: #fbbf24;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.badge-pending .badge-dot {
+  background-color: #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+  animation: dot-pulse-amber 2s infinite;
+}
+
+/* Verified — Blue */
+.badge-verified {
+  color: #60a5fa;
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+.badge-verified .badge-dot {
+  background-color: #3b82f6;
+  box-shadow: 0 0 6px rgba(59, 130, 246, 0.5);
+}
+
+/* Assigned — Purple */
+.badge-assigned {
+  color: #c084fc;
+  background: rgba(168, 85, 247, 0.12);
+  border-color: rgba(168, 85, 247, 0.3);
+}
+.badge-assigned .badge-dot {
+  background-color: #a855f7;
+  box-shadow: 0 0 6px rgba(168, 85, 247, 0.5);
+}
+
+/* Resolved — Green */
+.badge-resolved {
+  color: #4ade80;
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.3);
+}
+.badge-resolved .badge-dot {
+  background-color: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+}
+
+/* ── Severity Badges ── */
+
+/* Critical — Red */
+.badge-critical {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.14);
+  border-color: rgba(239, 68, 68, 0.35);
+  animation: pulse-red-glow 2.5s infinite;
+}
+
+@keyframes pulse-red-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  50% { box-shadow: 0 0 8px 0 rgba(239, 68, 68, 0.25); }
+}
+
 .severity-high {
+  color: #fb923c;
   background: rgba(249, 115, 22, 0.12);
-  border: 1px solid rgba(249, 115, 22, 0.25);
-  color: var(--signal-orange);
+  border-color: rgba(249, 115, 22, 0.3);
 }
 
 .severity-medium {
+  color: #fbbf24;
   background: rgba(245, 158, 11, 0.12);
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  color: var(--amber);
+  border-color: rgba(245, 158, 11, 0.25);
 }
 
 .severity-low {
+  color: #4ade80;
   background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  color: var(--signal-green);
+  border-color: rgba(34, 197, 94, 0.25);
 }
 
-/* AI Confidence Badge */
+/* Dot pulse for pending */
+@keyframes dot-pulse-amber {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── AI Confidence Badge ── */
 .ai-confidence-badge {
   display: flex;
   flex-direction: column;
