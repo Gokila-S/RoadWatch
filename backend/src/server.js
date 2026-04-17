@@ -42,7 +42,8 @@ const bootstrapDatabase = async () => {
   }
 }
 
-app.use(cors({ origin: env.frontendOrigin, credentials: true }))
+const allowedOrigins = env.frontendOrigin.split(',').map((o) => o.trim()).filter(Boolean)
+app.use(cors({ origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins, credentials: true }))
 app.use(express.json({ limit: '2mb' }))
 
 app.get('/health', (req, res) => {

@@ -222,11 +222,11 @@ const MOCK_NOTIFICATIONS = [
 ]
 
 const DISTRICTS = [
-  { id: 'north', name: 'Chennai Region', admin: 'Rajesh Kumar', totalIssues: 156, resolved: 134, pending: 12, assigned: 10, avgResolution: '4.2 days' },
-  { id: 'south', name: 'Coimbatore Region', admin: 'Sunita Devi', totalIssues: 203, resolved: 178, pending: 15, assigned: 10, avgResolution: '3.8 days' },
-  { id: 'east', name: 'Madurai Region', admin: 'Mohammed Salim', totalIssues: 187, resolved: 152, pending: 18, assigned: 17, avgResolution: '5.1 days' },
-  { id: 'central', name: 'Trichy Region', admin: 'Preethi Rao', totalIssues: 142, resolved: 125, pending: 8, assigned: 9, avgResolution: '3.2 days' },
-  { id: 'west', name: 'Salem Region', admin: 'Ganesh Hegde', totalIssues: 98, resolved: 89, pending: 5, assigned: 4, avgResolution: '2.9 days' },
+  { id: 'coimbatore', name: 'Coimbatore', admin: 'Rajesh Kumar', totalIssues: 156, resolved: 134, pending: 12, assigned: 10, avgResolution: '4.2 days' },
+  { id: 'erode', name: 'Erode', admin: 'Sunita Devi', totalIssues: 203, resolved: 178, pending: 15, assigned: 10, avgResolution: '3.8 days' },
+  { id: 'tiruppur', name: 'Tiruppur', admin: 'Mohammed Salim', totalIssues: 187, resolved: 152, pending: 18, assigned: 17, avgResolution: '5.1 days' },
+  { id: 'salem', name: 'Salem', admin: 'Preethi Rao', totalIssues: 142, resolved: 125, pending: 8, assigned: 9, avgResolution: '3.2 days' },
+  { id: 'trichy', name: 'Trichy', admin: 'Ganesh Hegde', totalIssues: 98, resolved: 89, pending: 5, assigned: 4, avgResolution: '2.9 days' },
 ]
 
 const ANALYTICS_MONTHLY = [
