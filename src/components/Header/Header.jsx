@@ -42,10 +42,23 @@ const Header = () => {
     setProfileOpen(false)
   }, [location])
 
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.notif-wrapper') && !e.target.closest('.profile-wrapper')) {
+        setNotifOpen(false)
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   const handleLogout = () => {
     logout()
     navigate('/')
   }
+
+  const adminBasePath = userRole === 'super_admin' ? '/admin/super' : '/admin/district'
 
   const actionNotifications = useMemo(() => {
     if (!isAuthenticated) return []
@@ -60,9 +73,20 @@ const Header = () => {
         notifications.push({
           id: 'admin-critical',
           type: 'alert',
-          message: `${unresolvedCritical.length} critical issues need immediate attention.`,
+          message: `${unresolvedCritical.length} critical issue${unresolvedCritical.length > 1 ? 's' : ''} need immediate attention.`,
           time: formatRelativeTime(unresolvedCritical[0]?.updatedAt || unresolvedCritical[0]?.createdAt),
-          actionPath: '/reports?severity=critical',
+          actionPath: `${adminBasePath}?severity=critical`,
+        })
+      }
+
+      const pendingReports = activeReports.filter((r) => r.status === 'pending')
+      if (pendingReports.length > 0) {
+        notifications.push({
+          id: 'admin-pending',
+          type: 'update',
+          message: `${pendingReports.length} report${pendingReports.length > 1 ? 's' : ''} pending verification.`,
+          time: formatRelativeTime(pendingReports[0]?.createdAt),
+          actionPath: `${adminBasePath}?status=pending`,
         })
       }
 
@@ -70,10 +94,10 @@ const Header = () => {
       if (slaBreached.length > 0) {
         notifications.push({
           id: 'admin-sla-breach',
-          type: 'update',
-          message: `${slaBreached.length} reports have breached SLA. Prioritize escalation.`,
+          type: 'alert',
+          message: `${slaBreached.length} report${slaBreached.length > 1 ? 's have' : ' has'} breached SLA deadline.`,
           time: formatRelativeTime(slaBreached[0]?.slaDeadline),
-          actionPath: '/reports?status=pending',
+          actionPath: `${adminBasePath}?status=pending`,
         })
       }
 
@@ -82,9 +106,20 @@ const Header = () => {
         notifications.push({
           id: 'admin-verified',
           type: 'status',
-          message: `${verificationQueue.length} verified reports are awaiting assignment.`,
+          message: `${verificationQueue.length} verified report${verificationQueue.length > 1 ? 's' : ''} awaiting assignment.`,
           time: formatRelativeTime(verificationQueue[0]?.updatedAt || verificationQueue[0]?.createdAt),
-          actionPath: '/reports?status=verified',
+          actionPath: `${adminBasePath}?status=verified`,
+        })
+      }
+
+      const assignedReports = activeReports.filter((r) => r.status === 'assigned')
+      if (assignedReports.length > 0) {
+        notifications.push({
+          id: 'admin-assigned',
+          type: 'status',
+          message: `${assignedReports.length} report${assignedReports.length > 1 ? 's' : ''} assigned and awaiting resolution.`,
+          time: formatRelativeTime(assignedReports[0]?.updatedAt || assignedReports[0]?.createdAt),
+          actionPath: `${adminBasePath}?status=assigned`,
         })
       }
 
@@ -94,7 +129,7 @@ const Header = () => {
           notifications.push({
             id: 'super-inactive-admins',
             type: 'alert',
-            message: `${inactiveAdmins.length} district admin accounts are inactive and need review.`,
+            message: `${inactiveAdmins.length} district admin account${inactiveAdmins.length > 1 ? 's are' : ' is'} inactive.`,
             time: 'now',
             actionPath: '/admin/super#directory',
           })
@@ -108,7 +143,7 @@ const Header = () => {
           type: 'status',
           message: `Your report ${assigned[0].id} has been assigned to a field team.`,
           time: formatRelativeTime(assigned[0].updatedAt || assigned[0].createdAt),
-          actionPath: `/report/${assigned[0].id}`,
+          actionPath: '/dashboard',
         })
       }
 
@@ -117,9 +152,9 @@ const Header = () => {
         notifications.push({
           id: `citizen-resolved-${resolved[0].id}`,
           type: 'resolved',
-          message: `Report ${resolved[0].id} was resolved. Tap to review closure details.`,
+          message: `Report ${resolved[0].id} was resolved. Tap to review details.`,
           time: formatRelativeTime(resolved[0].updatedAt || resolved[0].createdAt),
-          actionPath: `/report/${resolved[0].id}`,
+          actionPath: '/dashboard',
         })
       }
 
@@ -141,15 +176,15 @@ const Header = () => {
         type: 'resolved',
         message: 'No pending alerts right now. Operations are stable.',
         time: 'now',
-        actionPath: userRole === 'citizen' ? '/dashboard' : '/reports',
+        actionPath: null,
       })
     }
 
-    return notifications.slice(0, 6).map((notif) => ({
+    return notifications.slice(0, 8).map((notif) => ({
       ...notif,
       read: readNotifIds.includes(notif.id),
     }))
-  }, [isAuthenticated, reports, districtAdmins, userRole, readNotifIds])
+  }, [isAuthenticated, reports, districtAdmins, userRole, readNotifIds, adminBasePath])
 
   const unreadCount = actionNotifications.filter((n) => !n.read).length
 
