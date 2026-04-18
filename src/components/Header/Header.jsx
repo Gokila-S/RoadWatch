@@ -231,12 +231,25 @@ const Header = () => {
           </div>
         </Link>
 
+        {/* Mobile overlay backdrop */}
+        {menuOpen && (
+          <div 
+            className="mobile-nav-backdrop"
+            onClick={() => setMenuOpen(false)}
+          />
+        )}
+
         <nav className={`header-nav ${menuOpen ? 'nav-open' : ''}`}>
+          {/* Mobile nav close button inside nav */}
+          <button className="mobile-nav-close" onClick={() => setMenuOpen(false)} aria-label="Close menu">
+            ✕
+          </button>
           {navLinks.map(link => (
             <Link
               key={link.path}
               to={link.path}
               className={`nav-link ${location.pathname === link.path ? 'nav-active' : ''}`}
+              onClick={() => setMenuOpen(false)}
             >
               {link.label}
               {location.pathname === link.path && (
@@ -382,10 +395,12 @@ const Header = () => {
             </Link>
           )}
 
+          {/* Hamburger - always rightmost */}
           <button
             className="mobile-menu-btn"
             onClick={() => setMenuOpen(!menuOpen)}
             aria-label="Toggle menu"
+            style={{ position: 'relative', zIndex: 10001 }}
           >
             <span className={`hamburger ${menuOpen ? 'hamburger-open' : ''}`}>
               <span></span><span></span><span></span>
