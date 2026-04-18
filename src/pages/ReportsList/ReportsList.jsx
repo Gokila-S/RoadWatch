@@ -1,20 +1,54 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  Search, Filter, Calendar, MapPin, X,
-  ArrowUpDown, Download, CheckSquare, AlertTriangle, CheckCircle2, HardHat, FileBox, XCircle, ChevronRight, Droplets, AlertOctagon, Construction
+  Search, Filter, Calendar, MapPin, X, SlidersHorizontal,
+  ArrowUpDown, Download, CheckSquare, AlertTriangle, CheckCircle2, 
+  HardHat, FileBox, XCircle, ChevronRight, Droplets, AlertOctagon, 
+  Construction, ScanSearch, Tag, Clock, ChevronDown, RotateCcw
 } from 'lucide-react'
 import useStore from '../../store/useStore'
 import { StatusBadge, SeverityBadge, AiConfidenceBadge } from '../../components/StatusBadge/StatusBadge'
 import './ReportsList.css'
 
 const CATEGORY_CONFIG = {
-  pothole: { label: 'Pothole', icon: AlertTriangle },
-  waterlogging: { label: 'Waterlogging', icon: Droplets },
-  hazard: { label: 'Hazard', icon: AlertOctagon },
-  crack: { label: 'Road Crack', icon: Construction },
+  pothole: { label: 'Pothole', icon: AlertTriangle, color: '#f59e0b' },
+  waterlogging: { label: 'Waterlogging', icon: Droplets, color: '#3b82f6' },
+  hazard: { label: 'Hazard', icon: AlertOctagon, color: '#ef4444' },
+  crack: { label: 'Road Crack', icon: Construction, color: '#a855f7' },
 }
+
+const STATUS_OPTIONS = [
+  { id: 'pending', label: 'Pending', color: '#f59e0b' },
+  { id: 'verified', label: 'Verified', color: '#3b82f6' },
+  { id: 'assigned', label: 'Assigned', color: '#a855f7' },
+  { id: 'resolved', label: 'Resolved', color: '#22c55e' },
+]
+
+const SEVERITY_OPTIONS = [
+  { id: 'critical', label: 'Critical', color: '#ef4444' },
+  { id: 'high', label: 'High', color: '#f97316' },
+  { id: 'medium', label: 'Medium', color: '#eab308' },
+  { id: 'low', label: 'Low', color: '#22c55e' },
+]
+
+const SLA_OPTIONS = [
+  { id: 'safe', label: 'On Track', color: '#22c55e' },
+  { id: 'warning', label: 'At Risk', color: '#f59e0b' },
+  { id: 'breached', label: 'Breached', color: '#ef4444' },
+]
+
+const DATE_OPTIONS = [
+  { id: 'today', label: 'Today' },
+  { id: 'week', label: 'Last 7 Days' },
+  { id: 'month', label: 'Last 30 Days' },
+]
+
+const SORT_OPTIONS = [
+  { id: 'date_desc', label: 'Newest First' },
+  { id: 'date_asc', label: 'Oldest First' },
+  { id: 'priority_desc', label: 'Highest Priority' },
+]
 
 const hasValidReportImage = (report) => Boolean(report?.images?.[0]) && !report.images[0].includes('placeholder')
 
@@ -61,7 +95,9 @@ const ReportsList = () => {
   const [selectedIds, setSelectedIds] = useState([])
   const [bulkAction, setBulkAction] = useState('')
   const [slaFilter, setSlaFilter] = useState('all')
-  const [confidenceFilter, setConfidenceFilter] = useState('all')
+  const [confidenceRange, setConfidenceRange] = useState([0, 100])
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [showSortDropdown, setShowSortDropdown] = useState(false)
   
   // Side Panel State
   const [selectedReport, setSelectedReport] = useState(null)
@@ -76,6 +112,32 @@ const ReportsList = () => {
 
     return Array.from(unique).sort((a, b) => a.localeCompare(b))
   }, [adminReports])
+
+  // Count active filters
+  const activeFilters = useMemo(() => {
+    const tags = []
+    if (statusFilter !== 'all') tags.push({ key: 'status', label: `Status: ${statusFilter}`, color: STATUS_OPTIONS.find(s => s.id === statusFilter)?.color, clear: () => setStatusFilter('all') })
+    if (severityFilter !== 'all') tags.push({ key: 'severity', label: `Severity: ${severityFilter}`, color: SEVERITY_OPTIONS.find(s => s.id === severityFilter)?.color, clear: () => setSeverityFilter('all') })
+    if (categoryFilter !== 'all') tags.push({ key: 'category', label: `Type: ${CATEGORY_CONFIG[categoryFilter]?.label || categoryFilter}`, color: CATEGORY_CONFIG[categoryFilter]?.color, clear: () => setCategoryFilter('all') })
+    if (districtFilter !== 'all') tags.push({ key: 'district', label: `District: ${districtFilter}`, color: '#06b6d4', clear: () => setDistrictFilter('all') })
+    if (slaFilter !== 'all') tags.push({ key: 'sla', label: `SLA: ${SLA_OPTIONS.find(s => s.id === slaFilter)?.label}`, color: SLA_OPTIONS.find(s => s.id === slaFilter)?.color, clear: () => setSlaFilter('all') })
+    if (confidenceRange[0] > 0 || confidenceRange[1] < 100) tags.push({ key: 'confidence', label: `AI: ${confidenceRange[0]}%–${confidenceRange[1]}%`, color: '#06b6d4', clear: () => setConfidenceRange([0, 100]) })
+    if (dateRange !== 'all') tags.push({ key: 'date', label: `Time: ${DATE_OPTIONS.find(d => d.id === dateRange)?.label}`, color: '#9a9aab', clear: () => setDateRange('all') })
+    if (searchQuery) tags.push({ key: 'search', label: `Search: "${searchQuery}"`, color: '#9a9aab', clear: () => setSearchQuery('') })
+    return tags
+  }, [statusFilter, severityFilter, categoryFilter, districtFilter, slaFilter, confidenceRange, dateRange, searchQuery])
+
+  const clearAllFilters = useCallback(() => {
+    setStatusFilter('all')
+    setSeverityFilter('all')
+    setCategoryFilter('all')
+    setDistrictFilter('all')
+    setSlaFilter('all')
+    setConfidenceRange([0, 100])
+    setDateRange('all')
+    setSearchQuery('')
+    setSortBy('date_desc')
+  }, [])
 
   // Derived filtered & sorted data
   const filteredAndSortedReports = useMemo(() => {
@@ -99,9 +161,9 @@ const ReportsList = () => {
     
     // SLA Filtering
     if (slaFilter !== 'all') {
-      const now = new Date('2026-04-03T09:00:00Z')
+      const now = new Date()
       result = result.filter(r => {
-        if (r.status === 'resolved') return slaFilter === 'safe' // assume resolved is safe or skip
+        if (r.status === 'resolved') return slaFilter === 'safe'
         const diffH = (new Date(r.slaDeadline) - now) / 3600000;
         if (slaFilter === 'breached') return diffH < 0;
         if (slaFilter === 'warning') return diffH >= 0 && diffH < 12;
@@ -110,20 +172,19 @@ const ReportsList = () => {
       })
     }
 
-    // AI Confidence Filtering
-    if (confidenceFilter !== 'all') {
+    // AI Confidence Range Filtering
+    if (confidenceRange[0] > 0 || confidenceRange[1] < 100) {
       result = result.filter(r => {
-        if (confidenceFilter === 'high') return r.aiConfidence >= 90;
-        if (confidenceFilter === 'medium') return r.aiConfidence >= 70 && r.aiConfidence < 90;
-        if (confidenceFilter === 'low') return r.aiConfidence < 70;
-        return true;
+        const c = r.aiConfidence || 0
+        return c >= confidenceRange[0] && c <= confidenceRange[1]
       })
     }
 
     // Date Filtering
     if (dateRange !== 'all') {
-      const now = new Date('2026-04-03T09:00:00Z')
-      const todayStart = new Date(now.setHours(0,0,0,0))
+      const now = new Date()
+      const todayStart = new Date(now)
+      todayStart.setHours(0,0,0,0)
       const weekStart = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000)
       const monthStart = new Date(todayStart.getTime() - 30 * 24 * 60 * 60 * 1000)
       
@@ -148,7 +209,7 @@ const ReportsList = () => {
     })
 
     return result
-  }, [adminReports, dateRange, statusFilter, severityFilter, categoryFilter, districtFilter, searchQuery, sortBy, slaFilter, confidenceFilter])
+  }, [adminReports, dateRange, statusFilter, severityFilter, categoryFilter, districtFilter, searchQuery, sortBy, slaFilter, confidenceRange])
 
   // Handlers
   const toggleSelectAll = () => {
@@ -160,7 +221,7 @@ const ReportsList = () => {
   }
 
   const toggleSelect = (e, id) => {
-    e.stopPropagation() // Prevent row click
+    e.stopPropagation()
     if (selectedIds.includes(id)) {
       setSelectedIds(selectedIds.filter(i => i !== id))
     } else {
@@ -192,270 +253,432 @@ const ReportsList = () => {
     }
   }
 
+  const getSLAStatus = (report) => {
+    const deadline = new Date(report.slaDeadline)
+    const now = new Date()
+    const diffH = (deadline - now) / 3600000
+    
+    if (report.status === 'resolved') return { text: 'RESOLVED', class: 'sla-resolved' }
+    if (diffH < 0) return { text: 'BREACHED', class: 'sla-critical' }
+    if (diffH < 12) return { text: `${Math.floor(diffH)}h left`, class: 'sla-warn' }
+    return { text: `${Math.floor(diffH)}h left`, class: 'sla-safe' }
+  }
+
+  // KPI counts
+  const pendingCount = adminReports.filter(r => r.status === 'pending').length
+  const assignedCount = adminReports.filter(r => r.status === 'assigned').length
+  const criticalCount = adminReports.filter(r => r.severity === 'critical' && r.status !== 'resolved').length
+  const resolvedCount = adminReports.filter(r => r.status === 'resolved').length
+
   return (
-    <div className="reports-container sidebar-layout">
-      {/* LEFT SIDEBAR: Advanced Filters & KPIs */}
-      <div className="reports-sidebar">
-        
-        {/* KPI Section */}
-        <div className="sidebar-kpi-section">
-          <div className="kpi-item-side">
-            <span className="kpi-label-side">PENDING</span>
-            <span className="kpi-value-side" style={{ color: 'var(--amber)' }}>{adminReports.filter(r => r.status === 'pending').length}</span>
-          </div>
-          <div className="kpi-item-side">
-            <span className="kpi-label-side">ASSIGNED</span>
-            <span className="kpi-value-side" style={{ color: 'var(--signal-blue)' }}>{adminReports.filter(r => r.status === 'assigned').length}</span>
-          </div>
-          <div className="kpi-item-side kpi-critical-side">
-            <span className="kpi-label-side" style={{ color: '#FF3B30' }}>CRITICAL</span>
-            <span className="kpi-value-side pulse-critical-text" style={{ color: '#FF3B30' }}>
-              {adminReports.filter(r => r.severity === 'critical' && r.status !== 'resolved').length}
-            </span>
+    <div className="reports-page">
+      {/* TOP COMMAND BAR */}
+      <div className="reports-command-bar">
+        <div className="command-bar-left">
+          <div className="command-kpi-row">
+            <button className={`kpi-pill ${statusFilter === 'pending' ? 'kpi-pill-active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')}>
+              <span className="kpi-pill-dot" style={{ background: '#f59e0b' }}></span>
+              <span className="kpi-pill-label">Pending</span>
+              <span className="kpi-pill-value" style={{ color: '#f59e0b' }}>{pendingCount}</span>
+            </button>
+            <button className={`kpi-pill ${statusFilter === 'assigned' ? 'kpi-pill-active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'assigned' ? 'all' : 'assigned')}>
+              <span className="kpi-pill-dot" style={{ background: '#a855f7' }}></span>
+              <span className="kpi-pill-label">Assigned</span>
+              <span className="kpi-pill-value" style={{ color: '#a855f7' }}>{assignedCount}</span>
+            </button>
+            <button className={`kpi-pill kpi-pill-critical ${severityFilter === 'critical' ? 'kpi-pill-active' : ''}`} onClick={() => setSeverityFilter(severityFilter === 'critical' ? 'all' : 'critical')}>
+              <span className="kpi-pill-dot kpi-dot-pulse" style={{ background: '#ef4444' }}></span>
+              <span className="kpi-pill-label">Critical</span>
+              <span className="kpi-pill-value" style={{ color: '#ef4444' }}>{criticalCount}</span>
+            </button>
+            <button className={`kpi-pill ${statusFilter === 'resolved' ? 'kpi-pill-active' : ''}`} onClick={() => setStatusFilter(statusFilter === 'resolved' ? 'all' : 'resolved')}>
+              <span className="kpi-pill-dot" style={{ background: '#22c55e' }}></span>
+              <span className="kpi-pill-label">Resolved</span>
+              <span className="kpi-pill-value" style={{ color: '#22c55e' }}>{resolvedCount}</span>
+            </button>
           </div>
         </div>
-
-        <div className="sidebar-divider"></div>
-
-        {/* Scrollable Filters Section */}
-        <div className="sidebar-filters">
-          <div className="filter-group">
-            <div className="toolbar-input-group">
-              <Search size={16} />
-              <input 
-                type="text" 
-                placeholder="Search ID or Location..."
-                className="toolbar-input-side"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
+        <div className="command-bar-right">
+          <div className="command-search-wrap">
+            <Search size={15} className="command-search-icon" />
+            <input 
+              type="text" 
+              placeholder="Search by ID, title, or location..."
+              className="command-search-input"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className="command-search-clear" onClick={() => setSearchQuery('')}>
+                <X size={14} />
+              </button>
+            )}
           </div>
-
-          <div className="filter-group">
-            <h4 className="filter-heading">Status</h4>
-            <div className="chip-container-side">
-              {['all', 'pending', 'verified', 'assigned', 'resolved'].map(status => (
-                <button 
-                  key={status}
-                  className={`filter-chip-side ${statusFilter === status ? 'active' : ''}`}
-                  onClick={() => setStatusFilter(status)}
+          <div className="command-sort-wrap">
+            <button className="command-sort-btn" onClick={() => setShowSortDropdown(!showSortDropdown)}>
+              <ArrowUpDown size={14} />
+              <span>{SORT_OPTIONS.find(s => s.id === sortBy)?.label}</span>
+              <ChevronDown size={12} />
+            </button>
+            <AnimatePresence>
+              {showSortDropdown && (
+                <motion.div 
+                  className="sort-dropdown"
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
                 >
-                  {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
-                </button>
-              ))}
-            </div>
+                  {SORT_OPTIONS.map(opt => (
+                    <button 
+                      key={opt.id} 
+                      className={`sort-option ${sortBy === opt.id ? 'sort-option-active' : ''}`}
+                      onClick={() => { setSortBy(opt.id); setShowSortDropdown(false) }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
+          <button className="command-filter-toggle" onClick={() => setShowMobileFilters(!showMobileFilters)}>
+            <SlidersHorizontal size={15} />
+            <span>Filters</span>
+            {activeFilters.length > 0 && <span className="filter-count-dot">{activeFilters.length}</span>}
+          </button>
+        </div>
+      </div>
 
-          <div className="filter-group">
-            <h4 className="filter-heading">Severity Feature</h4>
-            <div className="chip-container-side">
-              {['all', 'critical', 'high', 'medium', 'low'].map(sev => (
-                <button 
-                  key={sev}
-                  className={`filter-chip-side sev-${sev} ${severityFilter === sev ? 'active' : ''}`}
-                  onClick={() => setSeverityFilter(sev)}
-                >
-                  {sev === 'all' ? 'All' : sev.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="filter-group">
-            <h4 className="filter-heading">Issue Type</h4>
-            <div className="chip-container-side">
-              {[
-                { id: 'all', label: 'All' },
-                { id: 'pothole', label: 'Pothole' },
-                { id: 'waterlogging', label: 'Waterlogging' },
-                { id: 'hazard', label: 'Hazard' },
-                { id: 'crack', label: 'Road Crack' },
-              ].map(category => (
-                <button
-                  key={category.id}
-                  className={`filter-chip-side ${categoryFilter === category.id ? 'active' : ''}`}
-                  onClick={() => setCategoryFilter(category.id)}
-                >
-                  {category.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {user?.role === 'super_admin' && (
-            <div className="filter-group">
-              <h4 className="filter-heading">District</h4>
-              <div className="chip-container-side">
-                <button
-                  className={`filter-chip-side ${districtFilter === 'all' ? 'active' : ''}`}
-                  onClick={() => setDistrictFilter('all')}
-                >
-                  All
-                </button>
-                {districtOptions.map((district) => (
-                  <button
-                    key={district}
-                    className={`filter-chip-side ${districtFilter === district ? 'active' : ''}`}
-                    onClick={() => setDistrictFilter(district)}
+      {/* ACTIVE FILTER TAGS BAR */}
+      <AnimatePresence>
+        {activeFilters.length > 0 && (
+          <motion.div 
+            className="active-filters-bar"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+          >
+            <div className="active-filters-inner">
+              <span className="active-filters-label">
+                <Tag size={13} /> Active Filters
+              </span>
+              <div className="active-filter-tags">
+                {activeFilters.map(tag => (
+                  <motion.span 
+                    key={tag.key} 
+                    className="filter-tag"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    style={{ '--tag-color': tag.color }}
                   >
-                    {district}
+                    <span className="filter-tag-dot" style={{ background: tag.color }}></span>
+                    {tag.label}
+                    <button className="filter-tag-remove" onClick={tag.clear}>
+                      <X size={12} />
+                    </button>
+                  </motion.span>
+                ))}
+              </div>
+              <button className="clear-all-filters-btn" onClick={clearAllFilters}>
+                <RotateCcw size={12} />
+                Clear All
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="reports-body">
+        {/* LEFT SIDEBAR: Advanced Filters */}
+        <aside className={`reports-sidebar ${showMobileFilters ? 'sidebar-mobile-open' : ''}`}>
+          <div className="sidebar-header">
+            <h3 className="sidebar-title">
+              <SlidersHorizontal size={15} />
+              Advanced Filters
+            </h3>
+            <button className="sidebar-close-mobile" onClick={() => setShowMobileFilters(false)}>
+              <X size={18} />
+            </button>
+            {activeFilters.length > 0 && (
+              <button className="sidebar-reset-btn" onClick={clearAllFilters}>
+                <RotateCcw size={12} /> Reset
+              </button>
+            )}
+          </div>
+
+          <div className="sidebar-filters-scroll">
+            {/* STATUS */}
+            <div className="filter-section">
+              <h4 className="filter-section-label">Status</h4>
+              <div className="filter-chips-grid">
+                {STATUS_OPTIONS.map(opt => (
+                  <button 
+                    key={opt.id}
+                    className={`filter-chip-v2 ${statusFilter === opt.id ? 'chip-active' : ''}`}
+                    onClick={() => setStatusFilter(statusFilter === opt.id ? 'all' : opt.id)}
+                    style={{ '--chip-color': opt.color }}
+                  >
+                    <span className="chip-indicator" style={{ background: opt.color }}></span>
+                    {opt.label}
+                    {statusFilter === opt.id && <CheckCircle2 size={13} className="chip-check" />}
                   </button>
                 ))}
               </div>
             </div>
-          )}
 
-          <div className="filter-group">
-            <h4 className="filter-heading">SLA Status</h4>
-            <div className="chip-container-side">
-               {[
-                 { id: 'all', label: 'All' },
-                 { id: 'safe', label: 'Safe (>12h)' },
-                 { id: 'warning', label: 'Warning (<12h)' },
-                 { id: 'breached', label: 'Breached' }
-               ].map(f => (
-                 <button 
-                   key={f.id}
-                   className={`filter-chip-side ${slaFilter === f.id ? 'active' : ''}`}
-                   onClick={() => setSlaFilter(f.id)}
-                 >
-                   {f.label}
-                 </button>
-               ))}
+            {/* SEVERITY */}
+            <div className="filter-section">
+              <h4 className="filter-section-label">Severity</h4>
+              <div className="filter-chips-grid">
+                {SEVERITY_OPTIONS.map(opt => (
+                  <button 
+                    key={opt.id}
+                    className={`filter-chip-v2 ${severityFilter === opt.id ? 'chip-active' : ''}`}
+                    onClick={() => setSeverityFilter(severityFilter === opt.id ? 'all' : opt.id)}
+                    style={{ '--chip-color': opt.color }}
+                  >
+                    <span className="chip-indicator" style={{ background: opt.color }}></span>
+                    {opt.label}
+                    {severityFilter === opt.id && <CheckCircle2 size={13} className="chip-check" />}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {/* ISSUE TYPE */}
+            <div className="filter-section">
+              <h4 className="filter-section-label">Issue Type</h4>
+              <div className="filter-chips-grid">
+                {Object.entries(CATEGORY_CONFIG).map(([id, cfg]) => {
+                  const Icon = cfg.icon
+                  return (
+                    <button 
+                      key={id}
+                      className={`filter-chip-v2 chip-with-icon ${categoryFilter === id ? 'chip-active' : ''}`}
+                      onClick={() => setCategoryFilter(categoryFilter === id ? 'all' : id)}
+                      style={{ '--chip-color': cfg.color }}
+                    >
+                      <Icon size={13} />
+                      {cfg.label}
+                      {categoryFilter === id && <CheckCircle2 size={13} className="chip-check" />}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* AI CONFIDENCE RANGE */}
+            <div className="filter-section">
+              <h4 className="filter-section-label">AI Confidence</h4>
+              <div className="range-slider-block">
+                <div className="range-labels">
+                  <span className="range-value">{confidenceRange[0]}%</span>
+                  <span className="range-separator">to</span>
+                  <span className="range-value">{confidenceRange[1]}%</span>
+                </div>
+                <div className="dual-range-track">
+                  <input 
+                    type="range" 
+                    min="0" max="100" 
+                    value={confidenceRange[0]}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      if (val <= confidenceRange[1]) setConfidenceRange([val, confidenceRange[1]])
+                    }}
+                    className="range-input range-min"
+                  />
+                  <input 
+                    type="range" 
+                    min="0" max="100" 
+                    value={confidenceRange[1]}
+                    onChange={(e) => {
+                      const val = Number(e.target.value)
+                      if (val >= confidenceRange[0]) setConfidenceRange([confidenceRange[0], val])
+                    }}
+                    className="range-input range-max"
+                  />
+                  <div 
+                    className="range-fill" 
+                    style={{ 
+                      left: `${confidenceRange[0]}%`, 
+                      width: `${confidenceRange[1] - confidenceRange[0]}%` 
+                    }}
+                  ></div>
+                </div>
+                <div className="range-presets">
+                  <button className={`range-preset ${confidenceRange[0] >= 90 ? 'preset-active' : ''}`} onClick={() => setConfidenceRange([90, 100])}>
+                    High (90%+)
+                  </button>
+                  <button className={`range-preset ${confidenceRange[0] >= 70 && confidenceRange[1] <= 90 ? 'preset-active' : ''}`} onClick={() => setConfidenceRange([70, 90])}>
+                    Mid (70-90%)
+                  </button>
+                  <button className={`range-preset ${confidenceRange[1] <= 70 ? 'preset-active' : ''}`} onClick={() => setConfidenceRange([0, 70])}>
+                    Low (&lt;70%)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* SLA STATUS */}
+            <div className="filter-section">
+              <h4 className="filter-section-label">SLA Status</h4>
+              <div className="filter-chips-grid">
+                {SLA_OPTIONS.map(opt => (
+                  <button 
+                    key={opt.id}
+                    className={`filter-chip-v2 ${slaFilter === opt.id ? 'chip-active' : ''}`}
+                    onClick={() => setSlaFilter(slaFilter === opt.id ? 'all' : opt.id)}
+                    style={{ '--chip-color': opt.color }}
+                  >
+                    <span className="chip-indicator" style={{ background: opt.color }}></span>
+                    {opt.label}
+                    {slaFilter === opt.id && <CheckCircle2 size={13} className="chip-check" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* TIMEFRAME */}
+            <div className="filter-section">
+              <h4 className="filter-section-label">Timeframe</h4>
+              <div className="filter-chips-grid">
+                {DATE_OPTIONS.map(opt => (
+                  <button 
+                    key={opt.id}
+                    className={`filter-chip-v2 ${dateRange === opt.id ? 'chip-active' : ''}`}
+                    onClick={() => setDateRange(dateRange === opt.id ? 'all' : opt.id)}
+                    style={{ '--chip-color': '#9a9aab' }}
+                  >
+                    <Clock size={13} />
+                    {opt.label}
+                    {dateRange === opt.id && <CheckCircle2 size={13} className="chip-check" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* DISTRICT - Super Admin Only */}
+            {user?.role === 'super_admin' && (
+              <div className="filter-section">
+                <h4 className="filter-section-label">District</h4>
+                <div className="filter-chips-grid">
+                  {districtOptions.map(district => (
+                    <button
+                      key={district}
+                      className={`filter-chip-v2 ${districtFilter === district ? 'chip-active' : ''}`}
+                      onClick={() => setDistrictFilter(districtFilter === district ? 'all' : district)}
+                      style={{ '--chip-color': '#06b6d4' }}
+                    >
+                      <MapPin size={13} />
+                      {district}
+                      {districtFilter === district && <CheckCircle2 size={13} className="chip-check" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Overlay for mobile filters */}
+        {showMobileFilters && <div className="sidebar-overlay" onClick={() => setShowMobileFilters(false)} />}
+
+        {/* MAIN BODY: Card Grid */}
+        <div className="reports-main-area">
+          <div className="reports-results-info">
+            <span>{filteredAndSortedReports.length} report{filteredAndSortedReports.length !== 1 ? 's' : ''} found</span>
           </div>
 
-          <div className="filter-group">
-            <h4 className="filter-heading">AI Confidence</h4>
-            <div className="chip-container-side">
-               {[
-                 { id: 'all', label: 'All' },
-                 { id: 'high', label: '> 90%' },
-                 { id: 'medium', label: '70-90%' },
-                 { id: 'low', label: '< 70%' }
-               ].map(f => (
-                 <button 
-                   key={f.id}
-                   className={`filter-chip-side ${confidenceFilter === f.id ? 'active' : ''}`}
-                   onClick={() => setConfidenceFilter(f.id)}
-                 >
-                   {f.label}
+          {filteredAndSortedReports.length === 0 ? (
+             <div className="empty-state-ui">
+               <div className="empty-icon-wrap">
+                 <CheckCircle2 size={48} color="#22c55e" />
+               </div>
+               <h3>No Reports Found</h3>
+               <p>No active tasks match your current filter parameters or jurisdiction.</p>
+               {activeFilters.length > 0 && (
+                 <button className="empty-reset-btn" onClick={clearAllFilters}>
+                   <RotateCcw size={14} /> Clear All Filters
                  </button>
-               ))}
-            </div>
-          </div>
-
-          <div className="filter-group">
-            <h4 className="filter-heading">Timeframe</h4>
-            <div className="chip-container-side">
-               {[
-                 { id: 'all', label: 'All Time' },
-                 { id: 'today', label: 'Today' },
-                 { id: 'week', label: '7 Days' },
-                 { id: 'month', label: '30 Days' }
-               ].map(t => (
-                 <button 
-                   key={t.id}
-                   className={`filter-chip-side ${dateRange === t.id ? 'active' : ''}`}
-                   onClick={() => setDateRange(t.id)}
-                 >
-                   {t.label}
-                 </button>
-               ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* MAIN BODY: Grid Layout */}
-      <div className="reports-main-area">
-        {filteredAndSortedReports.length === 0 ? (
-           <div className="empty-state-ui">
-             <div className="empty-icon-wrap">
-               <CheckCircle2 size={48} color="#34C759" />
+               )}
              </div>
-             <h3>City is running smoothly</h3>
-             <p>No active tasks match your current filter parameters or jurisdiction.</p>
-           </div>
-        ) : (
-           <div className="report-card-grid">
-             {filteredAndSortedReports.map(report => {
-                const isCritical = report.severity === 'critical';
-               const categoryMeta = CATEGORY_CONFIG[report.category]
-               const CategoryIcon = categoryMeta?.icon || MapPin
-                
-                // Rough SLA calc
-                const sladeadline = new Date(report.slaDeadline);
-                const now = new Date('2026-04-03T09:00:00Z');
-                const diffH = (sladeadline - now) / 3600000;
-                let slaText = diffH < 0 ? 'BREACHED' : `${Math.floor(diffH)}h left`;
-                let slaClass = diffH < 0 ? 'sla-critical' : diffH < 12 ? 'sla-warn' : 'sla-safe';
-                if (report.status === 'resolved') {
-                  slaText = 'RESOLVED';
-                  slaClass = 'sla-resolved';
-                }
-
-                return (
-                  <div key={report.id} className="mission-card group" onClick={() => setSelectedReport(report)}>
-                     <div className="card-header">
-                       <span className="card-id">{report.id}</span>
-                       <span className={`severity-badge-custom sev-${report.severity} ${isCritical && report.status !== 'resolved' ? 'pulse-critical' : ''}`}>
-                         {report.severity.toUpperCase()}
-                       </span>
-                     </div>
-
-                     <div className="card-image-box">
-                       {hasValidReportImage(report) ? (
-                         <img src={report.images[0]} alt="report image" />
-                       ) : (
-                         <div className="no-image" aria-label={`${categoryMeta?.label || 'Report'} image missing`}>
-                           <CategoryIcon className="no-image-icon" size={34} />
-                         </div>
-                       )}
-                       <div className="status-overlay">
-                         <StatusBadge status={report.status} />
+          ) : (
+             <div className="report-card-grid">
+               {filteredAndSortedReports.map(report => {
+                  const isCritical = report.severity === 'critical';
+                 const categoryMeta = CATEGORY_CONFIG[report.category]
+                 const CategoryIcon = categoryMeta?.icon || MapPin
+                 const sla = getSLAStatus(report)
+                  
+                  return (
+                    <motion.div 
+                      key={report.id} 
+                      className="mission-card" 
+                      onClick={() => setSelectedReport(report)}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      layout
+                    >
+                       <div className="card-header">
+                         <span className="card-id">{report.id}</span>
+                         <span className={`severity-badge-custom sev-${report.severity} ${isCritical && report.status !== 'resolved' ? 'pulse-critical' : ''}`}>
+                           {report.severity.toUpperCase()}
+                         </span>
                        </div>
-                     </div>
 
-                     <div className="card-content">
-                       <h3 className="card-title line-clamp-1">{report.title}</h3>
-                       <div className="card-location line-clamp-1">
-                         <MapPin size={12} style={{ flexShrink: 0, marginTop: '1px' }} /> 
-                         <span>{report.location.address}</span>
-                       </div>
-                       
-                       <div className="card-footer">
-                         <div className="report-date">
-                           <Calendar size={12}/> {new Date(report.createdAt).toLocaleDateString()}
-                         </div>
-                         <div className={`sla-timer ${slaClass}`}>
-                           {slaText}
+                       <div className="card-image-box">
+                         {hasValidReportImage(report) ? (
+                           <img src={report.images[0]} alt="report image" />
+                         ) : (
+                           <div className="no-image" aria-label={`${categoryMeta?.label || 'Report'} image missing`}>
+                             <CategoryIcon className="no-image-icon" size={34} />
+                           </div>
+                         )}
+                         <div className="status-overlay">
+                           <StatusBadge status={report.status} />
                          </div>
                        </div>
-                     </div>
 
-                     {/* HOVER ACTIONS */}
-                     <div className="card-hover-actions">
-                       <button className="action-btn primary" onClick={(e) => { e.stopPropagation(); setSelectedReport(report); }}>
-                         Review Detail
-                       </button>
-                       {report.status === 'pending' && (
-                         <button className="action-btn secondary" onClick={(e) => { e.stopPropagation(); updateReportStatus(report.id, 'verified'); }}>
-                           Verify
+                       <div className="card-content">
+                         <h3 className="card-title line-clamp-1">{report.title}</h3>
+                         <div className="card-location line-clamp-1">
+                           <MapPin size={12} style={{ flexShrink: 0, marginTop: '1px' }} /> 
+                           <span>{report.location.address}</span>
+                         </div>
+                         
+                         <div className="card-footer">
+                           <div className="report-date">
+                             <Calendar size={12}/> {new Date(report.createdAt).toLocaleDateString()}
+                           </div>
+                           <div className={`sla-timer ${sla.class}`}>
+                             {sla.text}
+                           </div>
+                         </div>
+                       </div>
+
+                       {/* HOVER ACTIONS - Now with visible colored buttons */}
+                       <div className="card-hover-actions">
+                         <button className="hover-action-btn hover-action-review" onClick={(e) => { e.stopPropagation(); setSelectedReport(report); }}>
+                           <ScanSearch size={14} /> Review
                          </button>
-                       )}
-                       {report.status === 'verified' && (
-                         <button className="action-btn secondary" onClick={(e) => { e.stopPropagation(); updateReportStatus(report.id, 'assigned'); }}>
-                           Assign
-                         </button>
-                       )}
-                     </div>
-                  </div>
-                )
-             })}
-           </div>
-        )}
+                         {report.status === 'pending' && (
+                           <button className="hover-action-btn hover-action-verify" onClick={(e) => { e.stopPropagation(); updateReportStatus(report.id, 'verified'); }}>
+                             <CheckCircle2 size={14} /> Verify
+                           </button>
+                         )}
+                         {report.status === 'verified' && (
+                           <button className="hover-action-btn hover-action-assign" onClick={(e) => { e.stopPropagation(); updateReportStatus(report.id, 'assigned'); }}>
+                             <HardHat size={14} /> Assign
+                           </button>
+                         )}
+                       </div>
+                    </motion.div>
+                  )
+               })}
+             </div>
+          )}
+        </div>
       </div>
       
       {/* Slide-in Detail Panel */}
@@ -463,37 +686,37 @@ const ReportsList = () => {
         {selectedReport && (
           <>
             <motion.div 
+              className="panel-backdrop"
               initial={{ opacity: 0 }} 
               animate={{ opacity: 1 }} 
               exit={{ opacity: 0 }}
-              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', zIndex: 90 }}
               onClick={() => setSelectedReport(null)}
             />
             <motion.div 
               className="report-side-panel"
-              initial={{ x: '100%', boxShadow: '-10px 0 0 transparent' }}
-              animate={{ x: 0, boxShadow: '-10px 0 40px rgba(0,0,0,0.6)' }}
-              exit={{ x: '100%', boxShadow: '-10px 0 0 transparent' }}
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             >
+              {/* Panel Header */}
               <div className="side-panel-header">
                 <div>
-                  <h3 style={{ margin: 0, fontSize: '1rem', color: '#fff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    TICKET REGISTRY <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-dim)' }}>{selectedReport.id}</span>
+                  <h3 className="panel-title">
+                    TICKET REGISTRY <span className="panel-id">{selectedReport.id}</span>
                   </h3>
                 </div>
-                <button 
-                  onClick={() => setSelectedReport(null)}
-                  style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', padding: '4px' }}
-                >
+                <button className="panel-close-btn" onClick={() => setSelectedReport(null)}>
                   <X size={20} />
                 </button>
               </div>
               
+              {/* Panel Body */}
               <div className="side-panel-content">
-                <div style={{ position: 'relative', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border-subtle)', height: '240px', flexShrink: 0, backgroundColor: '#000' }}>
+                {/* Image Block */}
+                <div className="panel-image-block">
                    {hasValidReportImage(selectedReport) ? (
-                     <img src={selectedReport.images[0]} alt="evidence" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.9 }} />
+                     <img src={selectedReport.images[0]} alt="evidence" className="panel-evidence-img" />
                    ) : (
                      <div className="no-image no-image-detail" aria-label={`${CATEGORY_CONFIG[selectedReport.category]?.label || 'Report'} image missing`}>
                        {(() => {
@@ -502,44 +725,69 @@ const ReportsList = () => {
                        })()}
                      </div>
                    )}
-                   <div style={{ position: 'absolute', top: '12px', right: '12px', display: 'flex', gap: '8px', background: 'rgba(0,0,0,0.8)', padding: '4px', borderRadius: '6px' }}>
+                   <div className="panel-image-badges">
                      <StatusBadge status={selectedReport.status} />
+                     <SeverityBadge severity={selectedReport.severity} />
                    </div>
-                   <div style={{ position: 'absolute', bottom: '12px', left: '12px', right: '12px', backgroundColor: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)', padding: '12px', borderRadius: '6px', fontSize: '0.85rem', color: '#fff', border: '1px solid var(--border-dim)' }}>
-                     <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                       <MapPin size={16} color="var(--signal-cyan)" flexShrink={0} /> {selectedReport.location.address}
+                   <div className="panel-image-location">
+                     <MapPin size={14} color="var(--signal-cyan)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                     <span>{selectedReport.location.address}</span>
+                   </div>
+                </div>
+                
+                {/* AI Telemetry Block */}
+                <div className="panel-ai-block">
+                  <h4 className="panel-ai-title">
+                    <ScanSearch size={14} /> AI TELEMETRY
+                  </h4>
+                  <div className="panel-ai-content">
+                    <AiConfidenceBadge confidence={selectedReport.aiConfidence} />
+                    <p className="panel-ai-summary">
+                      Pattern match: <strong>{selectedReport.category?.toUpperCase()}</strong>. 
+                      Structural degradation estimated at <strong>{selectedReport.severity?.toUpperCase()}</strong> severity.
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Title & Description */}
+                <div className="panel-meta">
+                  <h3 className="panel-report-title">{selectedReport.title}</h3>
+                  <p className="panel-description">{selectedReport.description || "No supplemental notes provided."}</p>
+                </div>
+                
+                {/* Stats Grid */}
+                <div className="panel-stats-grid">
+                   <div className="panel-stat-card">
+                     <p className="panel-stat-label">TIME SINCE REPORTED</p>
+                     <p className="panel-stat-value">{Math.floor((new Date() - new Date(selectedReport.createdAt)) / 3600000)} Hours Ago</p>
+                   </div>
+                   <div className="panel-stat-card">
+                     <p className="panel-stat-label">SLA DEADLINE</p>
+                     <p className="panel-stat-value">
+                       <span className={getSLAStatus(selectedReport).class}>{getSLAStatus(selectedReport).text}</span>
                      </p>
                    </div>
                 </div>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <h3 style={{ fontSize: '1.2rem', fontWeight: 'bold', margin: 0, color: 'var(--text-primary)' }}>{selectedReport.title}</h3>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>{selectedReport.description}</p>
-                </div>
-                
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                   <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-dim)' }}>
-                     <p style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', margin: '0 0 8px 0' }}>CURRENT SEVERITY</p>
-                     <span className={`severity-badge-custom sev-${selectedReport.severity} w-full text-center block`}>
-                       {selectedReport.severity.toUpperCase()}
-                     </span>
-                   </div>
-                   <div style={{ background: 'rgba(0,0,0,0.3)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-dim)' }}>
-                     <p style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', margin: '0 0 8px 0' }}>AI CONFIDENCE</p>
-                     <AiConfidenceBadge confidence={selectedReport.aiConfidence} />
-                   </div>
+
+                {/* Severity highlight */}
+                <div className="panel-stat-card">
+                  <p className="panel-stat-label">CURRENT SEVERITY</p>
+                  <span className={`severity-badge-custom sev-${selectedReport.severity}`} style={{ display: 'inline-block', marginTop: '6px' }}>
+                    {selectedReport.severity?.toUpperCase()}
+                  </span>
                 </div>
               </div>
               
+              {/* Panel Footer - Action Buttons */}
               <div className="side-panel-footer">
-                <p style={{ fontSize: '10px', color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', margin: 0, letterSpacing: '1px' }}>ACTION TERMINAL</p>
+                <p className="panel-action-label">ACTION TERMINAL</p>
                 
                 {selectedReport.status === 'pending' && (
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                    <button className="btn btn-secondary border border-signal-blue text-signal-blue hover:bg-signal-blue/10 flex justify-center items-center gap-2" onClick={() => handlePanelAction('verified')}>
-                      <CheckCircle2 size={16} /> Verify
+                  <div className="panel-actions-grid">
+                    <button className="panel-action-btn panel-btn-verify" onClick={() => handlePanelAction('verified')}>
+                      <CheckCircle2 size={16} /> Verify Report
                     </button>
-                    <button className="btn btn-danger flex justify-center items-center gap-2" onClick={() => handlePanelAction('resolved')}>
+                    <button className="panel-action-btn panel-btn-reject" onClick={() => handlePanelAction('resolved')}>
                       <XCircle size={16} /> Reject
                     </button>
                   </div>
@@ -548,18 +796,23 @@ const ReportsList = () => {
                 {selectedReport.status === 'verified' && (
                   <>
                     {assigningMode ? (
-                      <div style={{ background: 'rgba(0,0,0,0.4)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-dim)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        <select style={{ width: '100%', background: 'var(--bg-secondary)', border: '1px solid var(--border-dim)', padding: '10px', borderRadius: '4px', color: 'white', outline: 'none' }}>
+                      <div className="panel-assign-form">
+                        <select className="panel-assign-select">
                           <option>Dept of Public Works</option>
                           <option>Water & Sewage Board</option>
+                          <option>Highway Maintenance</option>
                         </select>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => handlePanelAction('assigned')}>Dispatch</button>
-                          <button className="btn" style={{ background: 'transparent', border: '1px solid var(--border-dim)', color: 'var(--text-secondary)' }} onClick={() => setAssigningMode(false)}>Cancel</button>
+                        <div className="panel-assign-actions">
+                          <button className="panel-action-btn panel-btn-dispatch" onClick={() => handlePanelAction('assigned')}>
+                            Confirm Dispatch
+                          </button>
+                          <button className="panel-action-btn panel-btn-cancel" onClick={() => setAssigningMode(false)}>
+                            Cancel
+                          </button>
                         </div>
                       </div>
                     ) : (
-                      <button className="btn btn-primary flex justify-center items-center gap-2" style={{ padding: '12px' }} onClick={() => setAssigningMode(true)}>
+                      <button className="panel-action-btn panel-btn-assign-full" onClick={() => setAssigningMode(true)}>
                         <HardHat size={16} /> Assign to Worker
                       </button>
                     )}
@@ -567,14 +820,15 @@ const ReportsList = () => {
                 )}
                 
                 {selectedReport.status === 'assigned' && (
-                  <button className="btn w-full bg-signal-green text-black hover:brightness-110 font-bold flex justify-center items-center gap-2 py-3" onClick={() => handlePanelAction('resolved')}>
+                  <button className="panel-action-btn panel-btn-resolve" onClick={() => handlePanelAction('resolved')}>
                     <CheckCircle2 size={16} /> Validate & Resolve
                   </button>
                 )}
                 
                 {selectedReport.status === 'resolved' && (
-                  <div style={{ textAlign: 'center', padding: '12px', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', borderRadius: '8px', color: 'var(--signal-green)' }}>
-                    <p style={{ margin: 0, fontWeight: 'bold' }}>Resolved & Archived</p>
+                  <div className="panel-resolved-card">
+                    <CheckCircle2 size={20} />
+                    <span>Resolved & Archived</span>
                   </div>
                 )}
               </div>

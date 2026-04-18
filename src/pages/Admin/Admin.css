@@ -46,6 +46,7 @@
   overflow: hidden;
   z-index: 500;
   flex-shrink: 0;
+  min-height: 0;
 }
 
 /* ── Floating Stats ── */
@@ -364,6 +365,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
 }
 
 .report-list-item {
@@ -378,6 +380,7 @@
   position: relative;
   overflow: hidden;
   align-items: flex-start;
+  flex-shrink: 0;
 }
 
 .report-list-item:hover {
@@ -473,6 +476,7 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  min-height: 0;
 }
 
 .detail-header {
@@ -514,6 +518,7 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-height: 0;
 }
 
 .detail-image-block {
@@ -572,7 +577,7 @@
   border-radius: 10px;
   padding: 16px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .detail-ai-watermark {
@@ -580,13 +585,14 @@
   right: -16px;
   top: -16px;
   color: rgba(13, 203, 242, 0.08);
+  pointer-events: none;
 }
 
 .detail-ai-title {
   font-size: 0.72rem;
   font-family: var(--font-mono);
   color: var(--signal-cyan);
-  margin-bottom: 12px;
+  margin: 0 0 12px 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -598,13 +604,16 @@
   gap: 16px;
   position: relative;
   z-index: 10;
+  flex-wrap: wrap;
 }
 
 .detail-ai-summary {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--text-secondary);
   margin: 0;
   line-height: 1.5;
+  flex: 1;
+  min-width: 120px;
 }
 
 .detail-meta {
@@ -692,6 +701,7 @@
   transition: all var(--transition-fast);
   border: 1px solid transparent;
   background: none;
+  color: var(--text-primary);
 }
 
 .decision-btn-verify {
@@ -943,8 +953,9 @@
   }
 
   .workspace-map {
+    flex: none;
     height: 40vh;
-    min-height: 250px;
+    min-height: 300px;
   }
 
   .workspace-panel {
