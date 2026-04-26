@@ -46,5 +46,14 @@ It helps answer questions like:
 
 ```bash
 npm install
+npm run dev:ai
 npm run server
 npm run dev
+```
+
+The local AI upload service is expected at `http://127.0.0.1:5000`.
+If uploads say the AI service is unreachable, run:
+
+```bash
+python -m pip install -r ai_service/requirements.txt
+npm run dev:ai

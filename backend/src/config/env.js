@@ -16,6 +16,7 @@ export const env = {
   superAdminName: process.env.SUPER_ADMIN_NAME || 'RoadWatch Super Admin',
   superAdminPhone: process.env.SUPER_ADMIN_PHONE || '+91-9000000000',
   superAdminDistrict: process.env.SUPER_ADMIN_DISTRICT || 'ALL',
+  aiServiceUrl: process.env.AI_SERVICE_URL || 'http://127.0.0.1:5000',
 }
 
 if (!env.databaseUrl) {

@@ -48,6 +48,23 @@ CREATE INDEX IF NOT EXISTS idx_reports_severity ON reports(severity);
 CREATE INDEX IF NOT EXISTS idx_reports_district ON reports(district);
 CREATE INDEX IF NOT EXISTS idx_reports_created_at ON reports(created_at);
 
+CREATE TABLE IF NOT EXISTS report_media_uploads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  uploaded_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  report_id TEXT REFERENCES reports(id) ON DELETE SET NULL,
+  storage_path TEXT NOT NULL UNIQUE,
+  public_url TEXT NOT NULL UNIQUE,
+  mime_type TEXT NOT NULL,
+  original_name TEXT NOT NULL,
+  ai_prediction TEXT NOT NULL CHECK (ai_prediction IN ('road_damage', 'not_road')),
+  ai_confidence DOUBLE PRECISION NOT NULL CHECK (ai_confidence >= 0 AND ai_confidence <= 1),
+  verified_by_model BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_report_media_uploads_uploaded_by ON report_media_uploads(uploaded_by);
+CREATE INDEX IF NOT EXISTS idx_report_media_uploads_report_id ON report_media_uploads(report_id);
+
 CREATE TABLE IF NOT EXISTS announcements (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,

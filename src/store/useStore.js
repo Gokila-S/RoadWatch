@@ -679,7 +679,10 @@ const useStore = create((set, get) => ({
       throw new Error(data.message || 'Could not upload image')
     }
 
-    return data.media?.url
+    return {
+      media: data.media || null,
+      ai: data.ai || null,
+    }
   },
 
   updateReportStatus: async (id, status, resolution = '') => {

@@ -157,8 +157,9 @@ export const createReport = async (req, res, next) => {
       category,
       severity,
       location,
+      mediaIds = [],
       images = [],
-      aiConfidence = 85,
+      aiConfidence = null,
       slaHours = 72,
     } = req.body
 
@@ -188,8 +189,52 @@ export const createReport = async (req, res, next) => {
       return res.status(403).json({ message: 'Only citizens can create reports' })
     }
 
+    const normalizedMediaIds = Array.isArray(mediaIds)
+      ? [...new Set(mediaIds.filter((value) => typeof value === 'string' && value.trim()).map((value) => value.trim()))]
+      : []
+
+    if (normalizedMediaIds.length === 0) {
+      return res.status(400).json({ message: 'At least one AI-verified uploaded image is required' })
+    }
+
     await client.query('BEGIN')
     inTransaction = true
+
+    const mediaResult = await client.query(
+      `
+      SELECT id, public_url, ai_prediction, ai_confidence, report_id, uploaded_by, verified_by_model
+      FROM report_media_uploads
+      WHERE id = ANY($1::uuid[])
+      `,
+      [normalizedMediaIds],
+    )
+
+    if (mediaResult.rowCount !== normalizedMediaIds.length) {
+      await client.query('ROLLBACK')
+      inTransaction = false
+      return res.status(400).json({ message: 'One or more uploaded images could not be found' })
+    }
+
+    const invalidMedia = mediaResult.rows.find((media) => (
+      media.uploaded_by !== req.user.sub
+      || media.report_id
+      || !media.verified_by_model
+      || media.ai_prediction !== 'road_damage'
+      || Number(media.ai_confidence) < 0.8
+    ))
+
+    if (invalidMedia) {
+      await client.query('ROLLBACK')
+      inTransaction = false
+      return res.status(400).json({
+        message: 'Reports can only use unused AI-verified road-damage images uploaded by the current user',
+      })
+    }
+
+    const verifiedImageUrls = mediaResult.rows.map((media) => media.public_url)
+    const derivedAiConfidence = Math.round(
+      (mediaResult.rows.reduce((sum, media) => sum + Number(media.ai_confidence || 0), 0) / mediaResult.rows.length) * 100,
+    )
 
     const countResult = await client.query("SELECT COUNT(*)::int AS total FROM reports WHERE id LIKE 'RW-%'")
     const serial = String(countResult.rows[0].total + 1).padStart(4, '0')
@@ -216,13 +261,22 @@ export const createReport = async (req, res, next) => {
         lng,
         location.address,
         req.user.sub,
-        Number(aiConfidence),
-        images,
+        Number.isFinite(Number(aiConfidence)) ? Number(aiConfidence) : derivedAiConfidence,
+        verifiedImageUrls.length > 0 ? verifiedImageUrls : images,
         String(slaHours),
       ],
     )
 
     const report = insert.rows[0]
+
+    await client.query(
+      `
+      UPDATE report_media_uploads
+      SET report_id = $1
+      WHERE id = ANY($2::uuid[])
+      `,
+      [report.id, normalizedMediaIds],
+    )
 
     const reporter = await client.query('SELECT full_name FROM profiles WHERE id = $1', [req.user.sub])
 
