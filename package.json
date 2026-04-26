@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:api": "npm --prefix backend run dev",
+    "dev:ai": "python ai_service/app.py",
     "start:api": "npm --prefix backend start",
     "build": "vite build",
     "preview": "vite preview"

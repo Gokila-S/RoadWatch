@@ -453,7 +453,10 @@ const Report = () => {
     setSubmitting(true)
 
     try {
-      const uploadedImageUrl = await uploadReportMedia(imageFile)
+      const uploadResult = await uploadReportMedia(imageFile)
+      const uploadedImageUrl = uploadResult?.media?.url
+      const uploadedMediaId = uploadResult?.media?.id
+      const uploadAiConfidence = uploadResult?.ai?.confidence
 
       const response = await createReport({
         title: formData.title.trim(),
@@ -461,8 +464,9 @@ const Report = () => {
         category: formData.category,
         severity: formData.severity,
         location,
+        mediaIds: uploadedMediaId ? [uploadedMediaId] : [],
         images: uploadedImageUrl ? [uploadedImageUrl] : [],
-        aiConfidence: aiData?.confidence || 80,
+        aiConfidence: Number.isFinite(uploadAiConfidence) ? Math.round(uploadAiConfidence * 100) : undefined,
       })
 
       const report = response.report
