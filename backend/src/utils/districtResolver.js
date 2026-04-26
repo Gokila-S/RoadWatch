@@ -84,4 +84,4 @@ export const resolveDistrictFromCoordinates = (lat, lng) => {
 
 export const DISTRICT_BOUNDARIES = DISTRICT_GEOFENCES
 
-export const isSupportedDistrict = (district) => SUPPORTED_DISTRICTS.includes(district)
+export const isSupportedDistrict = (district) => SUPPORTED_DISTRICTS.includes(district) || district === 'ALL'

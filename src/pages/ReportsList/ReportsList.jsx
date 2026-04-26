@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import useStore from '../../store/useStore'
 import { StatusBadge, SeverityBadge, AiConfidenceBadge } from '../../components/StatusBadge/StatusBadge'
+import { getReportImage, FALLBACK_IMAGES } from '../../utils/imageFallback'
 import './ReportsList.css'
 
 const CATEGORY_CONFIG = {
@@ -49,9 +50,7 @@ const SORT_OPTIONS = [
   { id: 'date_asc', label: 'Oldest First' },
   { id: 'priority_desc', label: 'Highest Priority' },
 ]
-
-const hasValidReportImage = (report) => Boolean(report?.images?.[0]) && !report.images[0].includes('placeholder')
-
+// Removed hasValidReportImage
 const ReportsList = () => {
   const { reports, updateReportStatus, fetchReports, user } = useStore()
   const location = useLocation()
@@ -622,19 +621,20 @@ const ReportsList = () => {
                     >
                        <div className="card-header">
                          <span className="card-id">{report.id}</span>
-                         <span className={`severity-badge-custom sev-${report.severity} ${isCritical && report.status !== 'resolved' ? 'pulse-critical' : ''}`}>
-                           {report.severity.toUpperCase()}
-                         </span>
+                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                           {report.supportersCount > 1 && (
+                             <span className="text-xs px-2 py-1 rounded font-bold" style={{ backgroundColor: '#ef444420', color: '#ef4444', border: '1px solid #ef444450' }}>
+                               🔥 {report.supportersCount} Signals
+                             </span>
+                           )}
+                           <span className={`severity-badge-custom sev-${report.severity} ${isCritical && report.status !== 'resolved' ? 'pulse-critical' : ''}`}>
+                             {report.severity.toUpperCase()}
+                           </span>
+                         </div>
                        </div>
 
                        <div className="card-image-box">
-                         {hasValidReportImage(report) ? (
-                           <img src={report.images[0]} alt="report image" />
-                         ) : (
-                           <div className="no-image" aria-label={`${categoryMeta?.label || 'Report'} image missing`}>
-                             <CategoryIcon className="no-image-icon" size={34} />
-                           </div>
-                         )}
+                         <img src={getReportImage(report)} alt="report documentation" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = FALLBACK_IMAGES[report.category] || FALLBACK_IMAGES.default }} />
                          <div className="status-overlay">
                            <StatusBadge status={report.status} />
                          </div>
@@ -715,16 +715,7 @@ const ReportsList = () => {
               <div className="side-panel-content">
                 {/* Image Block */}
                 <div className="panel-image-block">
-                   {hasValidReportImage(selectedReport) ? (
-                     <img src={selectedReport.images[0]} alt="evidence" className="panel-evidence-img" />
-                   ) : (
-                     <div className="no-image no-image-detail" aria-label={`${CATEGORY_CONFIG[selectedReport.category]?.label || 'Report'} image missing`}>
-                       {(() => {
-                         const DetailIcon = CATEGORY_CONFIG[selectedReport.category]?.icon || MapPin
-                         return <DetailIcon className="no-image-icon" size={42} />
-                       })()}
-                     </div>
-                   )}
+                   <img src={getReportImage(selectedReport)} alt="evidence" className="panel-evidence-img" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = FALLBACK_IMAGES[selectedReport.category] || FALLBACK_IMAGES.default }} />
                    <div className="panel-image-badges">
                      <StatusBadge status={selectedReport.status} />
                      <SeverityBadge severity={selectedReport.severity} />
@@ -751,7 +742,14 @@ const ReportsList = () => {
                 
                 {/* Title & Description */}
                 <div className="panel-meta">
-                  <h3 className="panel-report-title">{selectedReport.title}</h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+                    <h3 className="panel-report-title" style={{ margin: 0 }}>{selectedReport.title}</h3>
+                    {selectedReport.supportersCount > 1 && (
+                      <span className="text-xs px-2 py-1 rounded font-bold" style={{ backgroundColor: '#ef444420', color: '#ef4444', border: '1px solid #ef444450' }}>
+                        🔥 {selectedReport.supportersCount} CITIZEN SIGNALS
+                      </span>
+                    )}
+                  </div>
                   <p className="panel-description">{selectedReport.description || "No supplemental notes provided."}</p>
                 </div>
                 

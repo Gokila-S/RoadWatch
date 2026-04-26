@@ -12,19 +12,18 @@ const mapAnnouncementRow = (row) => ({
   category: row.category,
   priority: row.priority,
   district: row.district,
-  ward: row.ward,
   location: {
     lat: row.location_lat == null ? null : Number(row.location_lat),
     lng: row.location_lng == null ? null : Number(row.location_lng),
   },
   reportCategories: row.report_categories || [],
   startsAt: row.starts_at,
-  expiresAt: row.expires_at,
   isPublished: row.is_published,
   createdBy: row.created_by,
   createdByName: row.created_by_name,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
+  createdByRole: row.created_by_role,
 })
 
 const normalizeWard = (value) => {
@@ -32,9 +31,7 @@ const normalizeWard = (value) => {
   return raw ? raw.toLowerCase() : null
 }
 
-const cleanupExpiredAnnouncements = async () => {
-  await pool.query('DELETE FROM announcements WHERE expires_at < NOW() - INTERVAL \'1 day\'')
-}
+
 
 const resolveRequestDistrict = ({ district, lat, lng }) => {
   const requestedLat = Number(lat)
@@ -53,13 +50,10 @@ const resolveRequestDistrict = ({ district, lat, lng }) => {
 
 export const listAnnouncements = async (req, res, next) => {
   try {
-    await cleanupExpiredAnnouncements()
-
-    const { category, district, ward, lat, lng, limit = 25 } = req.query
+    const { category, district, lat, lng, limit = 25 } = req.query
     const filters = [
       'a.is_published = TRUE',
-      'a.starts_at <= NOW()',
-      'a.expires_at > NOW()',
+      'a.starts_at <= NOW()'
     ]
     const values = []
 
@@ -76,20 +70,21 @@ export const listAnnouncements = async (req, res, next) => {
 
     if (req.user.role === 'district_admin') {
       values.push(req.user.district)
-      filters.push(`a.district = $${values.length}`)
+      filters.push(`(a.district = $${values.length} OR a.district = 'ALL')`)
     } else if (req.user.role === 'citizen') {
       values.push(req.user.district)
-      filters.push(`a.district = $${values.length}`)
+      filters.push(`(a.district = $${values.length} OR a.district = 'ALL')`)
+      filters.push(`p.role != 'super_admin'`)
     } else if (requestedDistrict) {
       values.push(requestedDistrict)
-      filters.push(`a.district = $${values.length}`)
+      if (requestedDistrict === 'ALL') {
+        filters.push(`a.district = 'ALL'`)
+      } else {
+        filters.push(`(a.district = $${values.length} OR a.district = 'ALL')`)
+      }
     }
 
-    const normalizedWard = normalizeWard(ward)
-    if (normalizedWard) {
-      values.push(normalizedWard)
-      filters.push(`(a.ward IS NULL OR lower(a.ward) = $${values.length})`)
-    }
+
 
     const safeLimit = Math.max(1, Math.min(50, Number(limit) || 25))
     values.push(safeLimit)
@@ -97,7 +92,8 @@ export const listAnnouncements = async (req, res, next) => {
     const query = `
       SELECT
         a.*,
-        p.full_name AS created_by_name
+        p.full_name AS created_by_name,
+        p.role AS created_by_role
       FROM announcements a
       JOIN profiles p ON p.id = a.created_by
       WHERE ${filters.join(' AND ')}
@@ -128,18 +124,16 @@ export const createAnnouncement = async (req, res, next) => {
       category,
       priority = 'normal',
       district,
-      ward,
       location,
       reportCategories = [],
       startsAt,
-      expiresAt,
     } = req.body
 
     const normalizedTitle = typeof title === 'string' ? title.trim() : ''
     const normalizedMessage = typeof message === 'string' ? message.trim() : ''
 
-    if (!normalizedTitle || !normalizedMessage || !category || !expiresAt) {
-      return res.status(400).json({ message: 'title, message, category, and expiresAt are required' })
+    if (!normalizedTitle || !normalizedMessage || !category) {
+      return res.status(400).json({ message: 'title, message, and category are required' })
     }
 
     if (!CATEGORY_VALUES.includes(category)) {
@@ -155,19 +149,9 @@ export const createAnnouncement = async (req, res, next) => {
     }
 
     const parsedStartsAt = startsAt ? new Date(startsAt) : new Date()
-    const parsedExpiresAt = new Date(expiresAt)
 
-    if (Number.isNaN(parsedStartsAt.getTime()) || Number.isNaN(parsedExpiresAt.getTime())) {
-      return res.status(400).json({ message: 'Invalid date format for startsAt or expiresAt' })
-    }
-
-    if (parsedExpiresAt <= parsedStartsAt) {
-      return res.status(400).json({ message: 'expiresAt must be after startsAt' })
-    }
-
-    const ttlHours = (parsedExpiresAt.getTime() - parsedStartsAt.getTime()) / (1000 * 60 * 60)
-    if (ttlHours > 14 * 24) {
-      return res.status(400).json({ message: 'Announcements can be scheduled for a maximum of 14 days' })
+    if (Number.isNaN(parsedStartsAt.getTime())) {
+      return res.status(400).json({ message: 'Invalid date format for startsAt' })
     }
 
     const safeReportCategories = Array.isArray(reportCategories)
@@ -179,7 +163,7 @@ export const createAnnouncement = async (req, res, next) => {
       return res.status(400).json({ message: 'A valid district is required' })
     }
 
-    const normalizedWard = normalizeWard(ward)
+
 
     const lat = location?.lat == null ? null : Number(location.lat)
     const lng = location?.lng == null ? null : Number(location.lng)
@@ -195,11 +179,11 @@ export const createAnnouncement = async (req, res, next) => {
       WHERE district = $1
         AND category = $2
         AND lower(title) = lower($3)
+        AND created_by = $4
         AND starts_at <= NOW()
-        AND expires_at > NOW()
       LIMIT 1
       `,
-      [announcementDistrict, category, normalizedTitle],
+      [announcementDistrict, category, normalizedTitle, req.user.sub],
     )
 
     if (duplicateCheck.rowCount > 0) {
@@ -228,16 +212,14 @@ export const createAnnouncement = async (req, res, next) => {
         category,
         priority,
         district,
-        ward,
         location_lat,
         location_lng,
         report_categories,
         starts_at,
-        expires_at,
         is_published,
         created_by
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::text[], $10, $11, TRUE, $12)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, TRUE, $10)
       RETURNING *
       `,
       [
@@ -246,23 +228,22 @@ export const createAnnouncement = async (req, res, next) => {
         category,
         priority,
         announcementDistrict,
-        normalizedWard,
         lat,
         lng,
         safeReportCategories,
         parsedStartsAt.toISOString(),
-        parsedExpiresAt.toISOString(),
         req.user.sub,
       ],
     )
 
-    const creator = await pool.query('SELECT full_name FROM profiles WHERE id = $1', [req.user.sub])
+    const creator = await pool.query('SELECT full_name, role FROM profiles WHERE id = $1', [req.user.sub])
 
     return res.status(201).json({
       message: 'Announcement created',
       announcement: mapAnnouncementRow({
         ...insert.rows[0],
         created_by_name: creator.rows[0]?.full_name || 'District Admin',
+        created_by_role: creator.rows[0]?.role || 'district_admin',
       }),
     })
   } catch (error) {
@@ -298,7 +279,7 @@ export const deleteAnnouncement = async (req, res, next) => {
 
 export const getRelatedAnnouncements = async (req, res, next) => {
   try {
-    const { category, district, ward, lat, lng, limit = 3 } = req.query
+    const { category, district, lat, lng, limit = 3 } = req.query
 
     if (!category || !REPORT_CATEGORY_VALUES.includes(category)) {
       return res.status(400).json({ message: 'Valid report category is required' })
@@ -313,16 +294,9 @@ export const getRelatedAnnouncements = async (req, res, next) => {
     const filters = [
       'a.is_published = TRUE',
       'a.starts_at <= NOW()',
-      'a.expires_at > NOW()',
       'a.district = $1',
       '(cardinality(a.report_categories) = 0 OR $2 = ANY(a.report_categories) OR a.category = \'alert\')',
     ]
-
-    const normalizedWard = normalizeWard(ward)
-    if (normalizedWard) {
-      values.push(normalizedWard)
-      filters.push(`(a.ward IS NULL OR lower(a.ward) = $${values.length})`)
-    }
 
     const safeLimit = Math.max(1, Math.min(5, Number(limit) || 3))
     values.push(safeLimit)
@@ -331,7 +305,8 @@ export const getRelatedAnnouncements = async (req, res, next) => {
       `
       SELECT
         a.*,
-        p.full_name AS created_by_name
+        p.full_name AS created_by_name,
+        p.role AS created_by_role
       FROM announcements a
       JOIN profiles p ON p.id = a.created_by
       WHERE ${filters.join(' AND ')}

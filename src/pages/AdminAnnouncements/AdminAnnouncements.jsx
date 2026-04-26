@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { BellRing, CalendarClock, MapPin, Megaphone, Trash2, Clock, ChevronDown, AlertTriangle } from 'lucide-react'
+import { BellRing, CalendarClock, Calendar, MapPin, Megaphone, Trash2, Clock, ChevronDown, AlertTriangle } from 'lucide-react'
 import useStore from '../../store/useStore'
 import './AdminAnnouncements.css'
 
@@ -13,29 +13,7 @@ const PRIORITY_CONFIG = {
   normal:   { label: 'Normal',   color: '#60a5fa', bg: 'rgba(59, 130, 246, 0.12)', border: 'rgba(59, 130, 246, 0.35)' },
 }
 
-const TTL_PRESETS = [
-  { value: '1', label: '1 hour' },
-  { value: '6', label: '6 hours' },
-  { value: '12', label: '12 hours' },
-  { value: '24', label: '1 day' },
-  { value: '48', label: '2 days' },
-  { value: '72', label: '3 days' },
-  { value: '168', label: '1 week' },
-  { value: '336', label: '2 weeks' },
-]
 
-const formatTimeLeft = (expiresAt) => {
-  const end = new Date(expiresAt)
-  const now = new Date()
-  const diffMs = end - now
-
-  if (diffMs <= 0) return 'Expired'
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-  if (diffHours < 1) return 'Ends in <1h'
-  if (diffHours < 24) return `${diffHours}h left`
-  const days = Math.floor(diffHours / 24)
-  return `${days}d left`
-}
 
 const AdminAnnouncements = () => {
   const {
@@ -55,8 +33,7 @@ const AdminAnnouncements = () => {
     message: '',
     category: 'update',
     priority: 'normal',
-    ward: '',
-    expiresInHours: '24',
+    targetDistrict: 'all',
     reportCategories: [],
   })
 
@@ -76,17 +53,35 @@ const AdminAnnouncements = () => {
     })
   }, [user?.role, user?.district, districtFilter, fetchAnnouncements])
 
-  const visibleAnnouncements = useMemo(() => {
+  const { directives, localAnnouncements } = useMemo(() => {
+    const sourceList = districtFilter === 'all'
+      ? announcements
+      : announcements.filter((item) => item.district === districtFilter || item.district === 'ALL')
+
+    const scopedAnnouncements = user?.role === 'district_admin'
+      ? announcements.filter((item) => item.district === user?.district || item.district === 'ALL')
+      : sourceList
+
+    const superAnnouncements = scopedAnnouncements.filter(
+      (item) => item.createdByRole === 'super_admin' || (user?.role === 'super_admin' && item.createdBy === user?.id),
+    )
+
+    const districtAnnouncements = scopedAnnouncements.filter(
+      (item) => item.createdByRole !== 'super_admin' && !(user?.role === 'super_admin' && item.createdBy === user?.id),
+    )
+
     if (user?.role === 'district_admin') {
-      return announcements.filter((item) => item.district === user.district)
+      return {
+        localAnnouncements: districtAnnouncements,
+        directives: superAnnouncements,
+      }
     }
 
-    if (districtFilter === 'all') {
-      return announcements
+    return {
+      localAnnouncements: districtAnnouncements,
+      directives: superAnnouncements,
     }
-
-    return announcements.filter((item) => item.district === districtFilter)
-  }, [announcements, user?.role, user?.district, districtFilter])
+  }, [announcements, user?.role, user?.district, user?.id, districtFilter])
 
   const districts = SUPPORTED_DISTRICTS
 
@@ -111,12 +106,6 @@ const AdminAnnouncements = () => {
       return
     }
 
-    const ttlHours = Number(form.expiresInHours)
-    if (!Number.isFinite(ttlHours) || ttlHours < 1 || ttlHours > 336) {
-      setError('Expiry must be between 1 and 336 hours')
-      return
-    }
-
     setSaving(true)
 
     try {
@@ -125,14 +114,12 @@ const AdminAnnouncements = () => {
         message: form.message,
         category: form.category,
         priority: form.priority,
-        ward: form.ward,
         reportCategories: form.reportCategories,
-        district: user?.role === 'super_admin' && districtFilter !== 'all'
-          ? districtFilter
+        district: user?.role === 'super_admin'
+          ? (form.targetDistrict === 'all' ? 'ALL' : form.targetDistrict)
           : user?.role === 'district_admin'
             ? user.district
             : undefined,
-        expiresAt: new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString(),
       })
 
       setForm({
@@ -140,8 +127,7 @@ const AdminAnnouncements = () => {
         message: '',
         category: 'update',
         priority: 'normal',
-        ward: '',
-        expiresInHours: '24',
+        targetDistrict: 'all',
         reportCategories: [],
       })
       setSuccess('Announcement published successfully!')
@@ -262,34 +248,21 @@ const AdminAnnouncements = () => {
             </div>
           </div>
 
-          {/* Ward & Expiry */}
-          <div className="ann-field-row">
+          {user?.role === 'super_admin' && (
             <div className="ann-field">
-              <label className="ann-field-label">Ward <span className="optional-tag">(optional)</span></label>
-              <input
-                type="text"
-                className="ann-input"
-                placeholder="e.g. Ward 5"
-                value={form.ward}
-                onChange={(e) => setForm((prev) => ({ ...prev, ward: e.target.value }))}
-              />
-            </div>
-
-            <div className="ann-field">
-              <label className="ann-field-label">
-                <Clock size={12} /> Expires After
-              </label>
+              <label className="ann-field-label">Target District</label>
               <select
                 className="ann-select"
-                value={form.expiresInHours}
-                onChange={(e) => setForm((prev) => ({ ...prev, expiresInHours: e.target.value }))}
+                value={form.targetDistrict}
+                onChange={(e) => setForm((prev) => ({ ...prev, targetDistrict: e.target.value }))}
               >
-                {TTL_PRESETS.map((preset) => (
-                  <option key={preset.value} value={preset.value}>{preset.label}</option>
+                <option value="all">Global (All Districts)</option>
+                {districts.map((d) => (
+                  <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             </div>
-          </div>
+          )}
 
           {/* Report Category Tags */}
           <div className="ann-field">
@@ -317,62 +290,129 @@ const AdminAnnouncements = () => {
           </button>
         </section>
 
-        {/* List */}
-        <section className="admin-ann-list-section card">
-          <h2 className="ann-list-title">
-            <BellRing size={18} /> Active Announcements
-            <span className="ann-list-count">{visibleAnnouncements.length}</span>
-          </h2>
+        <div className="admin-ann-lists">
+          {/* List */}
+          <section className="admin-ann-list-section card">
+            <h2 className="ann-list-title flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <BellRing size={18} /> {user?.role === 'super_admin' ? 'District Admin Announcements' : 'District Announcements'}
+              </span>
+              <span className="ann-list-count">{localAnnouncements.length}</span>
+            </h2>
 
-          <div className="admin-ann-scroll">
-            {visibleAnnouncements.length > 0 ? (
-              visibleAnnouncements.map((item, index) => {
-                const prioConfig = PRIORITY_CONFIG[item.priority] || PRIORITY_CONFIG.normal
-                return (
-                  <motion.div
-                    key={item.id}
-                    className="ann-list-item"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: index * 0.04 }}
-                  >
-                    <div className="ann-list-item-content">
-                      <div className="ann-list-item-header">
-                        <strong>{item.title}</strong>
-                        <span
-                          className="ann-priority-badge"
-                          style={{ color: prioConfig.color, background: prioConfig.bg, borderColor: prioConfig.border }}
-                        >
-                          {prioConfig.label}
-                        </span>
-                      </div>
-                      <p className="ann-list-item-message">{item.message}</p>
-                      <div className="ann-list-item-meta">
-                        <span><MapPin size={12} /> {item.ward || item.district}</span>
-                        <span><CalendarClock size={12} /> {formatTimeLeft(item.expiresAt)}</span>
-                        <span className="ann-item-category">{item.category}</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="ann-delete-btn"
-                      onClick={() => handleDelete(item.id)}
-                      title="Delete announcement"
+            <div className="admin-ann-scroll">
+              {localAnnouncements.length > 0 ? (
+                localAnnouncements.map((item, index) => {
+                  const prioConfig = PRIORITY_CONFIG[item.priority] || PRIORITY_CONFIG.normal
+                  return (
+                    <motion.div
+                      key={item.id}
+                      className="ann-list-item"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.04 }}
                     >
-                      <Trash2 size={14} />
-                    </button>
-                  </motion.div>
-                )
-              })
-            ) : (
-              <div className="ann-list-empty">
-                <BellRing size={28} style={{ color: 'var(--text-tertiary)' }} />
-                <p>No active announcements for this scope.</p>
-              </div>
-            )}
-          </div>
-        </section>
+                      <div className="ann-list-item-content">
+                        <div className="ann-list-item-header">
+                          <strong>{item.title}</strong>
+                          <span
+                            className="ann-priority-badge"
+                            style={{ color: prioConfig.color, background: prioConfig.bg, borderColor: prioConfig.border }}
+                          >
+                            {prioConfig.label}
+                          </span>
+                        </div>
+                        <p className="ann-list-item-message">{item.message}</p>
+                        <div className="ann-list-item-meta">
+                          <span><Calendar size={12} /> {new Date(item.createdAt).toLocaleDateString()}</span>
+                          <span><MapPin size={12} /> {item.district}</span>
+                          <span className="ann-item-category">{item.category}</span>
+                        </div>
+                      </div>
+
+                      {user?.role !== 'district_admin' && (
+                        <button
+                          type="button"
+                          className="ann-delete-btn"
+                          onClick={() => handleDelete(item.id)}
+                          title="Delete announcement"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </motion.div>
+                  )
+                })
+              ) : (
+                <div className="ann-list-empty">
+                  <BellRing size={28} style={{ color: 'var(--text-tertiary)' }} />
+                  <p>No district admin announcements for this scope.</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="admin-ann-list-section card border border-amber-500 border-opacity-20">
+            <h2 className="ann-list-title flex items-center justify-between" style={{ color: 'var(--amber)' }}>
+              <span className="flex items-center gap-2">
+                <AlertTriangle size={18} /> {user?.role === 'super_admin' ? 'Super Admin Announcements' : 'Super Admin Directives'}
+              </span>
+              <span className="ann-list-count" style={{ background: 'var(--amber)' }}>{directives.length}</span>
+            </h2>
+
+            <div className="admin-ann-scroll">
+              {directives.length > 0 ? (
+                directives.map((item, index) => {
+                  const prioConfig = PRIORITY_CONFIG[item.priority] || PRIORITY_CONFIG.normal
+                  return (
+                    <motion.div
+                      key={item.id}
+                      className="ann-list-item"
+                      style={{ borderColor: 'rgba(245, 158, 11, 0.2)' }}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.04 }}
+                    >
+                      <div className="ann-list-item-content">
+                        <div className="ann-list-item-header">
+                          <strong>{item.title}</strong>
+                          <span
+                            className="ann-priority-badge"
+                            style={{ color: prioConfig.color, background: prioConfig.bg, borderColor: prioConfig.border }}
+                          >
+                            {prioConfig.label}
+                          </span>
+                        </div>
+                        <p className="ann-list-item-message text-secondary">{item.message}</p>
+                        <div className="ann-list-item-meta">
+                          <span style={{ color: 'var(--text-dim)' }}><Calendar size={12} /> {new Date(item.createdAt).toLocaleDateString()}</span>
+                          <span style={{ color: 'var(--text-dim)' }}><MapPin size={12} /> {item.district}</span>
+                          <span className="ann-item-category text-amber-500">{item.category}</span>
+                        </div>
+                      </div>
+
+                      {user?.role !== 'district_admin' && (
+                        <button
+                          type="button"
+                          className="ann-delete-btn"
+                          onClick={() => handleDelete(item.id)}
+                          title="Delete directive"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </motion.div>
+                  )
+                })
+              ) : (
+                <div className="ann-list-empty">
+                  <AlertTriangle size={28} style={{ color: 'var(--amber)' }} />
+                  <p>No super admin announcements for this scope.</p>
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   )

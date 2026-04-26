@@ -426,9 +426,10 @@ const SuperAdmin = () => {
             ) : (
               <div className="sa-admin-cards">
                 {filteredAdmins.map(admin => {
-                  const distReports = reports?.filter(r => r.district === admin.district) || []
-                  const resolved = distReports.filter(r => r.status === 'resolved').length
-                  const resolveRate = distReports.length > 0 ? Math.round((resolved / distReports.length) * 100) : 0
+                  const joinedAt = admin.createdAt || admin.created_at
+                  const joinedLabel = joinedAt
+                    ? new Date(joinedAt).toLocaleDateString()
+                    : 'Unknown'
 
                   return (
                     <motion.div
@@ -460,15 +461,9 @@ const SuperAdmin = () => {
                         </div>
                       </div>
                       <div className="sa-admin-card-stats">
-                        <span className="sa-admin-stat"><Clock size={11} /> {distReports.length} Reports</span>
-                        <span className="sa-admin-stat"><CheckCircle size={11} /> {resolved} Resolved</span>
                         <span className="sa-admin-stat"><Phone size={11} /> {admin.phone || 'N/A'}</span>
-                      </div>
-                      <div className="sa-dc-progress-row">
-                        <div className="sa-dc-progress-track">
-                          <div className="sa-dc-progress-fill" style={{ width: `${resolveRate}%` }}></div>
-                        </div>
-                        <span className="sa-dc-resolve-rate">{resolveRate}%</span>
+                        <span className="sa-admin-stat"><MapPin size={11} /> Scope: {admin.district}</span>
+                        <span className="sa-admin-stat"><Clock size={11} /> Joined: {joinedLabel}</span>
                       </div>
                     </motion.div>
                   )

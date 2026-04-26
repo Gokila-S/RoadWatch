@@ -234,7 +234,7 @@ export const seedCoreData = async () => {
           id, title, description, category, severity, status, district,
           location_lat, location_lng, location_address,
           reported_by, assigned_to, ai_confidence, images, resolution,
-          created_at, updated_at, sla_deadline
+          created_at, updated_at, sla_deadline, supporters
         )
         VALUES (
           $1, $2, $3, $4, $5, $6, $7,
@@ -242,7 +242,8 @@ export const seedCoreData = async () => {
           $11, $12, $13, $14::text[], $15,
           NOW() - ((RANDOM() * 120)::int || ' day')::interval,
           NOW() - ((RANDOM() * 30)::int || ' day')::interval,
-          NOW() + ((RANDOM() * 96)::int || ' hour')::interval
+          NOW() + INTERVAL '72 hours',
+          ARRAY[$11]::uuid[]
         )
         ON CONFLICT (id) DO UPDATE SET
           title = EXCLUDED.title,
@@ -312,15 +313,13 @@ export const seedCoreData = async () => {
           message = $2,
           category = $3,
           priority = $4,
-          ward = $6,
-          report_categories = $7::text[],
-          starts_at = NOW() + ($8 || ' hour')::interval,
-          expires_at = NOW() + ($9 || ' hour')::interval,
+          report_categories = $6::text[],
+          starts_at = NOW() + ($7 || ' hour')::interval,
           is_published = TRUE,
           updated_at = NOW()
         WHERE title = $1
           AND district = $5
-          AND created_by = $10
+          AND created_by = $8
         `,
         [
           announcement.title,
@@ -328,10 +327,8 @@ export const seedCoreData = async () => {
           announcement.category,
           announcement.priority,
           announcement.district,
-          announcement.ward,
           announcement.report_categories,
           String(announcement.starts_in_hours),
-          String(announcement.expires_in_hours),
           createdBy,
         ],
       )
@@ -348,10 +345,8 @@ export const seedCoreData = async () => {
           category,
           priority,
           district,
-          ward,
           report_categories,
           starts_at,
-          expires_at,
           is_published,
           created_by
         )
@@ -361,12 +356,10 @@ export const seedCoreData = async () => {
           $3,
           $4,
           $5,
-          $6,
-          $7::text[],
-          NOW() + ($8 || ' hour')::interval,
-          NOW() + ($9 || ' hour')::interval,
+          $6::text[],
+          NOW() + ($7 || ' hour')::interval,
           TRUE,
-          $10
+          $8
         `,
         [
           announcement.title,
@@ -374,10 +367,8 @@ export const seedCoreData = async () => {
           announcement.category,
           announcement.priority,
           announcement.district,
-          announcement.ward,
           announcement.report_categories,
           String(announcement.starts_in_hours),
-          String(announcement.expires_in_hours),
           createdBy,
         ],
       )

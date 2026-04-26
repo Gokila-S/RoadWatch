@@ -11,7 +11,7 @@ const MIN_CATEGORY_CONFIDENCE = 60
 
 const Report = () => {
   const navigate = useNavigate()
-  const { createReport, uploadReportMedia, fetchRelatedAnnouncements } = useStore()
+  const { createReport, uploadReportMedia, fetchRelatedAnnouncements, checkSimilarReports, supportReport } = useStore()
   const [step, setStep] = useState(1) // 1: Camera Focus, 2: Details Focus, 3: Success
   const [image, setImage] = useState(null)
   const [imageFile, setImageFile] = useState(null)
@@ -21,12 +21,14 @@ const Report = () => {
   const [aiData, setAiData] = useState(null)
   const [createdReportId, setCreatedReportId] = useState('')
   const [submitError, setSubmitError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false)
+  const [isSupportingIssue, setIsSupportingIssue] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
   const [locationError, setLocationError] = useState('')
   const [cameraError, setCameraError] = useState('')
   const [cameraReady, setCameraReady] = useState(false)
   const [relatedAnnouncements, setRelatedAnnouncements] = useState([])
+  const [similarReports, setSimilarReports] = useState([])
   const [checkingRelatedAnnouncements, setCheckingRelatedAnnouncements] = useState(false)
   const cameraInputRef = useRef(null)
   const galleryInputRef = useRef(null)
@@ -48,6 +50,7 @@ const Report = () => {
 
   const locationReady = Number.isFinite(location.lat) && Number.isFinite(location.lng) && Boolean(location.address)
   const roadValidationPassed = Number.isFinite(roadImageScore) && roadImageScore >= 45
+  const shouldDisableDeploy = isSupportingIssue || similarReports.length > 0
 
   const analyzeRoadLikelihood = async (file) => {
     const objectUrl = URL.createObjectURL(file)
@@ -406,28 +409,37 @@ const Report = () => {
   useEffect(() => {
     if (!formData.category || !locationReady || step !== 2) {
       setRelatedAnnouncements([])
+      setSimilarReports([])
       return
     }
 
     setCheckingRelatedAnnouncements(true)
 
-    fetchRelatedAnnouncements({
-      category: formData.category,
-      location,
-      limit: 3,
+    Promise.all([
+      fetchRelatedAnnouncements({
+        category: formData.category,
+        location,
+        limit: 3,
+      }),
+      checkSimilarReports({
+        category: formData.category,
+        location,
+        radiusKm: 0.1,
+      })
+    ]).then(([announcementsData, reportsData]) => {
+      setRelatedAnnouncements(announcementsData)
+      setSimilarReports(reportsData)
+    }).catch(() => {
+      setRelatedAnnouncements([])
+      setSimilarReports([])
+    }).finally(() => {
+      setCheckingRelatedAnnouncements(false)
     })
-      .then((items) => {
-        setRelatedAnnouncements(items)
-      })
-      .catch(() => {
-        setRelatedAnnouncements([])
-      })
-      .finally(() => {
-        setCheckingRelatedAnnouncements(false)
-      })
-  }, [fetchRelatedAnnouncements, formData.category, location, locationReady, step])
+  }, [fetchRelatedAnnouncements, checkSimilarReports, formData.category, location, locationReady, step])
 
   const handleSubmit = async () => {
+    if (isSubmittingReport || isSupportingIssue) return
+
     setSubmitError('')
 
     if (!formData.category) {
@@ -450,7 +462,7 @@ const Report = () => {
       return
     }
 
-    setSubmitting(true)
+    setIsSubmittingReport(true)
 
     try {
       const uploadResult = await uploadReportMedia(imageFile)
@@ -479,7 +491,23 @@ const Report = () => {
     } catch (error) {
       setSubmitError(error.message || 'Failed to submit report')
     } finally {
-      setSubmitting(false)
+      setIsSubmittingReport(false)
+    }
+  }
+
+  const handleSupportReport = async (reportId) => {
+    if (isSupportingIssue) return
+
+    setSubmitError('')
+    setIsSupportingIssue(true)
+    try {
+      await supportReport(reportId)
+      setCreatedReportId(reportId)
+      setStep(3) // Head to success screen
+    } catch (error) {
+      setSubmitError(error.message || 'Failed to support existing report')
+    } finally {
+      setIsSupportingIssue(false)
     }
   }
 
@@ -760,11 +788,11 @@ const Report = () => {
                    <div className="report-announcement-check-block">
                      <div className="report-announcement-check-head">
                        <BellRing size={16} />
-                       <span>Related Area Announcements</span>
+                       <span>Related Area Intelligence</span>
                      </div>
                      {checkingRelatedAnnouncements ? (
-                       <p className="report-announcement-check-note">Checking for nearby alerts and maintenance updates...</p>
-                     ) : relatedAnnouncements.length > 0 ? (
+                       <p className="report-announcement-check-note">Checking for nearby alerts and similar reports...</p>
+                     ) : (relatedAnnouncements.length > 0 || similarReports.length > 0) ? (
                        <div className="report-announcement-list">
                          {relatedAnnouncements.map((item) => (
                            <div key={item.id} className="report-announcement-item">
@@ -775,23 +803,46 @@ const Report = () => {
                              <p>{item.message}</p>
                            </div>
                          ))}
+                         {similarReports.map((item) => (
+                           <div key={item.id} className="report-announcement-item report-announcement-item-similar">
+                             <div className="report-announcement-item-head report-announcement-item-head-similar">
+                               <strong className="report-similar-title">Similar Report Found</strong>
+                               <span className="report-announcement-priority report-similar-supporters">{item.supportersCount || 1} Citizens using this signal</span>
+                             </div>
+                             <p className="report-similar-message">A similar issue was already reported nearby ({item.id}). Support it to group internal signals and escalate urgency.</p>
+                             <button
+                               type="button"
+                               disabled={isSupportingIssue}
+                               onClick={() => handleSupportReport(item.id)}
+                               className="capture-option-btn report-support-btn w-full text-center"
+                             >
+                               {isSupportingIssue ? 'Updating...' : `Support Existing Issue`}
+                             </button>
+                           </div>
+                         ))}
                        </div>
                      ) : (
-                       <p className="report-announcement-check-note">No matching active announcements found for this issue type and location.</p>
+                       <p className="report-announcement-check-note">No matching active announcements or nearby duplicate reports found.</p>
                      )}
                    </div>
                  </div>
 
                  <button 
                     onClick={handleSubmit}
-                    disabled={!formData.category || !formData.severity || !locationReady || submitting || analyzing || !aiData || aiData.rejected}
-                    className={`btn btn-primary btn-lg w-full flex items-center justify-center gap-2 py-4 shadow-lg ${
-                    (!formData.category || !formData.severity || !locationReady || submitting || analyzing || !aiData || aiData.rejected) ? 'opacity-50 pointer-events-none grayscale' : 'hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]'
+                    disabled={shouldDisableDeploy}
+                    className={`btn btn-primary btn-lg w-full flex items-center justify-center gap-2 py-4 shadow-lg mb-8 ${
+                    shouldDisableDeploy ? 'opacity-50 pointer-events-none grayscale' : 'hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]'
                     }`}
                  >
-                    {analyzing ? 'System Analyzing...' : submitting ? 'Uploading Media...' : 'Deploy Report Protocol'} <ChevronRight size={18} />
+                    {analyzing
+                     ? 'System Analyzing...'
+                     : isSubmittingReport
+                      ? 'Uploading Media...'
+                      : similarReports.length > 0
+                        ? 'Use Support Existing Issue'
+                        : 'Deploy Report Protocol'} <ChevronRight size={18} />
                  </button>
-                    {submitError ? <p className="text-dim" style={{ color: '#ff6b6b' }}>{submitError}</p> : null}
+                    {submitError ? <p className="text-dim mb-8" style={{ color: '#ff6b6b' }}>{submitError}</p> : null}
                </div>
              </div>
           </motion.div>

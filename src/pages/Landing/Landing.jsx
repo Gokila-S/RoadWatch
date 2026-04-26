@@ -7,10 +7,14 @@ import logoImg from '../../assets/logo.png'
 import './Landing.css'
 
 const Landing = () => {
-  const { reports, getStats } = useStore()
+  const { reports, getStats, fetchReports } = useStore()
   const stats = getStats()
   const [counters, setCounters] = useState({ resolved: 0, active: 0, citizens: 0 })
   const heroRef = useRef(null)
+
+  useEffect(() => {
+    fetchReports({ scope: 'all' }).catch(console.error)
+  }, [fetchReports])
 
   // Animated counter
   useEffect(() => {
@@ -33,7 +37,7 @@ const Landing = () => {
     }, interval)
 
     return () => clearInterval(timer)
-  }, [])
+  }, [stats.totalResolved, stats.total, stats.citizenCount])
 
   const features = [
     {

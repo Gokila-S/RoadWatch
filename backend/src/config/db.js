@@ -5,13 +5,11 @@ import { env } from './env.js'
 const { Pool } = pg
 
 // Some networks time out on IPv6 routes to managed Postgres hosts.
-// Prefer IPv4 first to reduce intermittent ETIMEDOUT failures.
-dns.setDefaultResultOrder('ipv4first')
+// If you encounter `ETIMEDOUT` errors without IPv4, switch to the Supabase Supavisor connection pool URL (port 6543) in your .env
 
 export const pool = new Pool({
   connectionString: env.databaseUrl,
   ssl: { rejectUnauthorized: false },
-  family: 4,
   keepAlive: true,
   keepAliveInitialDelayMillis: 10000,
   connectionTimeoutMillis: 30000,

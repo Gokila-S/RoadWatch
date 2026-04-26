@@ -5,6 +5,7 @@ import { AlertTriangle, CloudRain, Construction, ImageOff, MapPin } from 'lucide
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
 import { StatusBadge, SeverityBadge } from '../../components/StatusBadge/StatusBadge'
+import { getReportImage, FALLBACK_IMAGES } from '../../utils/imageFallback'
 import './Dashboard.css'
 
 const toRadians = (value) => (value * Math.PI) / 180
@@ -29,26 +30,19 @@ const CategoryIcon = ({ category }) => {
   return <ImageOff size={18} />
 }
 
-const ReportThumbnail = ({ imageUrl, category }) => {
+const ReportThumbnail = ({ report }) => {
   const [failed, setFailed] = useState(false)
-  const hasImage = Boolean(imageUrl) && !failed
-
-  if (hasImage) {
-    return (
-      <img
-        src={imageUrl}
-        alt="Reported issue"
-        className="report-thumb-image"
-        loading="lazy"
-        onError={() => setFailed(true)}
-      />
-    )
-  }
+  const imageUrl = failed ? (FALLBACK_IMAGES[report.category] || FALLBACK_IMAGES.default) : getReportImage(report)
 
   return (
-    <div className="report-thumb-fallback">
-      <CategoryIcon category={category} />
-    </div>
+    <img
+      src={imageUrl}
+      alt="Reported issue"
+      className="report-thumb-image"
+      loading="lazy"
+      onError={() => setFailed(true)}
+      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+    />
   )
 }
 
@@ -99,21 +93,32 @@ const Dashboard = () => {
   }, [])
   
   // Filter reports for current citizen
-  const citizenReports = reports.filter(r => r.reportedBy === user?.id)
+  const citizenReports = reports.filter(r => r.reportedBy === user?.id || (Array.isArray(r.supporters) && r.supporters.includes(user?.id)))
 
-  const activeReports = citizenReports.filter(r => r.status !== 'resolved')
+  const activeReports = reports.filter(r => r.reportedBy === user?.id && r.status !== 'resolved')
+  const supportedActiveReports = reports.filter(r => r.reportedBy !== user?.id && Array.isArray(r.supporters) && r.supporters.includes(user?.id) && r.status !== 'resolved')
   const resolvedReports = citizenReports.filter(r => r.status === 'resolved')
 
   const mapCenter = useMemo(() => {
-    if (userLocation) return userLocation
+    const allActive = [...activeReports, ...supportedActiveReports]
+    const firstGeoReport = allActive.find((report) => report.location?.lat && report.location?.lng)
 
-    const firstGeoReport = activeReports.find((report) => report.location?.lat && report.location?.lng)
+    if (userLocation) {
+      if (firstGeoReport) {
+        const dist = calculateDistanceKm(userLocation[0], userLocation[1], firstGeoReport.location.lat, firstGeoReport.location.lng)
+        // If the browser ISP location is more than 50km from their active localized reports,
+        // center the map back on their incidents to prevent showing an empty canvas.
+        if (dist > 50) return [firstGeoReport.location.lat, firstGeoReport.location.lng]
+      }
+      return userLocation
+    }
+
     if (firstGeoReport) {
       return [firstGeoReport.location.lat, firstGeoReport.location.lng]
     }
 
-    return [11.15, 77.65]
-  }, [userLocation, activeReports])
+    return [11.15, 77.65] // Core Erode defaults
+  }, [userLocation, activeReports, supportedActiveReports])
 
   const mapReports = useMemo(() => {
     if (!userLocation) {
@@ -123,7 +128,7 @@ const Dashboard = () => {
     const [userLat, userLng] = userLocation
 
     return reports.filter((report) => {
-      const isOwnReport = report.reportedBy === user?.id
+      const isOwnReport = report.reportedBy === user?.id || (Array.isArray(report.supporters) && report.supporters.includes(user?.id))
       if (isOwnReport) return true
 
       const lat = report.location?.lat
@@ -163,9 +168,9 @@ const Dashboard = () => {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.1 }}
                   >
-                    <Link to={`/report/${report.id}`} className="report-card card flex gap-md block w-full text-left">
+                    <Link to={`/report/${report.id}`} className="report-card card flex gap-md w-full text-left">
                       <div className="report-thumb rounded-md overflow-hidden bg-tertiary" style={{width: '100px', flexShrink: 0}}>
-                        <ReportThumbnail imageUrl={report.images?.[0]} category={report.category} />
+                        <ReportThumbnail report={report} />
                       </div>
                       
                       <div className="flex-1 flex flex-col justify-between py-1">
@@ -200,6 +205,54 @@ const Dashboard = () => {
             )}
           </section>
 
+          {supportedActiveReports.length > 0 && (
+            <section className="reports-section space-y-md mt-xl">
+              <h2 className="heading-sm flex items-center gap-xs">
+                <span className="text-signal-blue text-mono">//</span> Supported Issues
+                <span className="badge" style={{background: 'var(--bg-tertiary)'}}>{supportedActiveReports.length}</span>
+              </h2>
+              
+              <div className="reports-list space-y-sm">
+                {supportedActiveReports.map((report, i) => (
+                  <motion.div 
+                    key={report.id} 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                  >
+                    <Link to={`/report/${report.id}`} className="report-card card flex gap-md w-full text-left" style={{ borderColor: 'rgba(56, 189, 248, 0.2)' }}>
+                      <div className="report-thumb rounded-md overflow-hidden bg-tertiary" style={{width: '100px', flexShrink: 0}}>
+                        <ReportThumbnail report={report} />
+                      </div>
+                      
+                      <div className="flex-1 flex flex-col justify-between py-1">
+                        <div>
+                          <div className="flex-1 min-w-0 pr-4">
+                            <div className="flex justify-between items-start gap-4 mb-2">
+                              <h3 className="text-base font-semibold text-primary line-clamp-1 flex-1">{report.title}</h3>
+                              <div className="flex-shrink-0">
+                                <StatusBadge status={report.status} />
+                              </div>
+                            </div>
+                          </div>
+                          <p className="text-sm text-secondary line-clamp-1">{report.location.address}</p>
+                        </div>
+                        
+                        <div className="report-meta-row mt-sm">
+                          <div className="report-meta-left">
+                            <SeverityBadge severity={report.severity} />
+                            <span className="text-xs text-mono text-dim self-center">{report.id}</span>
+                          </div>
+                          <span className="text-xs text-dim report-updated">Updated {new Date(report.updatedAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </Link>
+                  </motion.div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <section className="reports-section space-y-md mt-xl">
             <h2 className="heading-sm flex items-center gap-xs text-muted">
               Resolved Reports
@@ -209,9 +262,9 @@ const Dashboard = () => {
             {resolvedReports.length > 0 && (
               <div className="reports-list space-y-sm opacity-80">
                 {resolvedReports.map((report) => (
-                  <Link key={report.id} to={`/report/${report.id}`} className="report-card card flex gap-md border-dim block w-full text-left">
+                  <Link key={report.id} to={`/report/${report.id}`} className="report-card card flex gap-md border-dim w-full text-left">
                     <div className="report-thumb rounded-md overflow-hidden bg-tertiary" style={{ width: '100px', flexShrink: 0 }}>
-                      <ReportThumbnail imageUrl={report.images?.[0]} category={report.category} />
+                      <ReportThumbnail report={report} />
                     </div>
 
                     <div className="flex-1 flex flex-col justify-between py-1">

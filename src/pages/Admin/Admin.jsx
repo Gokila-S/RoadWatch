@@ -2,13 +2,14 @@ import { useState, useMemo, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  ChevronLeft, Search, Filter, Clock, MapPin as MapPinIcon, 
+  ChevronLeft, Clock, MapPin as MapPinIcon, 
   AlertTriangle, CheckCircle2, XCircle, HardHat, AlertOctagon, ScanSearch, Droplets, Construction,
-  ChevronDown, X
+  ChevronDown
 } from 'lucide-react'
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
 import { StatusBadge, SeverityBadge, AiConfidenceBadge } from '../../components/StatusBadge/StatusBadge'
+import { getReportImage, FALLBACK_IMAGES } from '../../utils/imageFallback'
 import './Admin.css'
 
 const CATEGORY_CONFIG = {
@@ -58,8 +59,6 @@ const DISTRICT_BOUNDARIES = {
   ],
 }
 
-const hasValidReportImage = (report) => Boolean(report?.images?.[0]) && !report.images[0].includes('placeholder')
-
 const Admin = () => {
   const { 
     reports, 
@@ -72,22 +71,17 @@ const Admin = () => {
   
   const [selectedReport, setSelectedReport] = useState(null)
   const [assigningId, setAssigningId] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterCategory, setFilterCategory] = useState('all')
-  const [showFilters, setShowFilters] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
-  // Read URL search params on mount (from notifications)
+  // Read URL search params on mount
   useEffect(() => {
     const statusParam = searchParams.get('status')
     const severityParam = searchParams.get('severity')
     if (statusParam && ['pending', 'verified', 'assigned', 'resolved'].includes(statusParam)) {
       setFilterStatus(statusParam)
-      setShowFilters(true)
     }
     if (severityParam && ['critical', 'high', 'medium', 'low'].includes(severityParam)) {
       setFilterSeverity(severityParam)
-      setShowFilters(true)
     }
     // Clean up the URL after reading
     if (statusParam || severityParam) {
@@ -110,8 +104,6 @@ const Admin = () => {
   const filteredReports = adminReports.filter(r => {
     if (filterStatus !== 'all' && r.status !== filterStatus) return false
     if (filterSeverity !== 'all' && r.severity !== filterSeverity) return false
-    if (filterCategory !== 'all' && r.category !== filterCategory) return false
-    if (searchQuery && !r.title.toLowerCase().includes(searchQuery.toLowerCase()) && !r.id.toLowerCase().includes(searchQuery.toLowerCase())) return false
     return true
   })
 
@@ -120,15 +112,6 @@ const Admin = () => {
   const assignedCount = adminReports.filter(r => r.status === 'assigned').length
   const criticalCount = adminReports.filter(r => r.severity === 'critical' && r.status !== 'resolved').length
   const districtBoundary = user?.district ? DISTRICT_BOUNDARIES[user.district] : null
-
-  const activeFilterCount = [filterStatus, filterSeverity, filterCategory].filter(f => f !== 'all').length
-
-  const clearAllFilters = () => {
-    setFilterStatus('all')
-    setFilterSeverity('all')
-    setFilterCategory('all')
-    setSearchQuery('')
-  }
 
   const handleAction = async (status, note = '') => {
     if (selectedReport) {
@@ -171,19 +154,19 @@ const Admin = () => {
           
           {/* FLOATING STATS OVERLAY */}
           <div className="floating-stats-panel">
-            <div className="admin-stat-box stat-clickable" onClick={() => { setFilterStatus('pending'); setShowFilters(false) }}>
+            <div className="admin-stat-box stat-clickable" onClick={() => { setFilterStatus('pending') }}>
               <span className="stat-label">Pending</span>
               <span className="stat-value" style={{ color: STATUS_COLORS.pending }}>{pendingCount}</span>
             </div>
-            <div className="admin-stat-box stat-clickable" onClick={() => { setFilterStatus('verified'); setShowFilters(false) }}>
+            <div className="admin-stat-box stat-clickable" onClick={() => { setFilterStatus('verified') }}>
               <span className="stat-label">Verified</span>
               <span className="stat-value" style={{ color: STATUS_COLORS.verified }}>{verifiedCount}</span>
             </div>
-            <div className="admin-stat-box stat-clickable" onClick={() => { setFilterStatus('assigned'); setShowFilters(false) }}>
+            <div className="admin-stat-box stat-clickable" onClick={() => { setFilterStatus('assigned') }}>
               <span className="stat-label">Assigned</span>
               <span className="stat-value" style={{ color: STATUS_COLORS.assigned }}>{assignedCount}</span>
             </div>
-            <div className="admin-stat-box alert-box stat-clickable" style={{ borderRight: 'none' }} onClick={() => { setFilterSeverity('critical'); setShowFilters(false) }}>
+            <div className="admin-stat-box alert-box stat-clickable" style={{ borderRight: 'none' }} onClick={() => { setFilterSeverity('critical') }}>
               <span className="stat-label" style={{ color: '#f87171' }}>Critical</span>
               <span className="stat-value">{criticalCount}</span>
             </div>
@@ -208,134 +191,18 @@ const Admin = () => {
             // LIST VIEW
             <div className="panel-list-view">
                
-               {/* Search & Filters */}
                <div className="filter-section">
                  <div className="filter-section-header">
                    <h2 className="filter-section-title">
                      <Clock size={16} color="var(--amber)" /> Live Incident Feed
                    </h2>
-                   <button 
-                     className={`filter-toggle-btn ${showFilters ? 'active' : ''}`}
-                     onClick={() => setShowFilters(!showFilters)}
-                   >
-                     <Filter size={14} />
-                     Filters
-                     {activeFilterCount > 0 && <span className="filter-count-badge">{activeFilterCount}</span>}
-                   </button>
                  </div>
-                 
-                 {/* Search */}
-                 <div className="search-wrapper">
-                   <Search className="search-icon" size={16} />
-                   <input 
-                     type="text" 
-                     placeholder="Search by title, ID, or location..." 
-                     className="search-input" 
-                     value={searchQuery} 
-                     onChange={(e) => setSearchQuery(e.target.value)} 
-                   />
-                   {searchQuery && (
-                     <button className="search-clear" onClick={() => setSearchQuery('')}>
-                       <X size={14} />
-                     </button>
-                   )}
-                 </div>
-                 
-                 {/* Expandable Filter Panel */}
-                 <AnimatePresence>
-                   {showFilters && (
-                     <motion.div 
-                       className="advanced-filters"
-                       initial={{ height: 0, opacity: 0 }}
-                       animate={{ height: 'auto', opacity: 1 }}
-                       exit={{ height: 0, opacity: 0 }}
-                       transition={{ duration: 0.2 }}
-                     >
-                       {/* Status Filter Chips */}
-                       <div className="filter-group">
-                         <label className="filter-group-label">STATUS</label>
-                         <div className="filter-chips">
-                           {[
-                             { id: 'all', label: 'All' },
-                             { id: 'pending', label: 'Pending', color: STATUS_COLORS.pending },
-                             { id: 'verified', label: 'Verified', color: STATUS_COLORS.verified },
-                             { id: 'assigned', label: 'Assigned', color: STATUS_COLORS.assigned },
-                             { id: 'resolved', label: 'Resolved', color: STATUS_COLORS.resolved },
-                           ].map(s => (
-                             <button 
-                               key={s.id}
-                               className={`filter-chip ${filterStatus === s.id ? 'active' : ''}`}
-                               onClick={() => setFilterStatus(s.id)}
-                               style={filterStatus === s.id && s.color ? { borderColor: s.color, color: s.color, backgroundColor: `${s.color}15` } : {}}
-                             >
-                               {s.color && <span className="filter-chip-dot" style={{ backgroundColor: s.color }}></span>}
-                               {s.label}
-                             </button>
-                           ))}
-                         </div>
-                       </div>
-
-                       {/* Severity Filter Chips */}
-                       <div className="filter-group">
-                         <label className="filter-group-label">SEVERITY</label>
-                         <div className="filter-chips">
-                           {[
-                             { id: 'all', label: 'All' },
-                             { id: 'critical', label: 'Critical', color: '#ef4444' },
-                             { id: 'high', label: 'High', color: '#f97316' },
-                             { id: 'medium', label: 'Medium', color: '#f59e0b' },
-                             { id: 'low', label: 'Low', color: '#22c55e' },
-                           ].map(s => (
-                             <button 
-                               key={s.id}
-                               className={`filter-chip ${filterSeverity === s.id ? 'active' : ''}`}
-                               onClick={() => setFilterSeverity(s.id)}
-                               style={filterSeverity === s.id && s.color ? { borderColor: s.color, color: s.color, backgroundColor: `${s.color}15` } : {}}
-                             >
-                               {s.label}
-                             </button>
-                           ))}
-                         </div>
-                       </div>
-
-                       {/* Category Filter Chips */}
-                       <div className="filter-group">
-                         <label className="filter-group-label">CATEGORY</label>
-                         <div className="filter-chips">
-                           {[
-                             { id: 'all', label: 'All' },
-                             { id: 'pothole', label: 'Pothole' },
-                             { id: 'crack', label: 'Crack' },
-                             { id: 'waterlogging', label: 'Waterlogging' },
-                             { id: 'hazard', label: 'Hazard' },
-                           ].map(s => (
-                             <button 
-                               key={s.id}
-                               className={`filter-chip ${filterCategory === s.id ? 'active' : ''}`}
-                               onClick={() => setFilterCategory(s.id)}
-                             >
-                               {s.label}
-                             </button>
-                           ))}
-                         </div>
-                       </div>
-
-                       {activeFilterCount > 0 && (
-                         <button className="clear-all-btn" onClick={clearAllFilters}>
-                           <X size={12} /> Clear all filters
-                         </button>
-                       )}
-                     </motion.div>
-                   )}
-                 </AnimatePresence>
                </div>
 
                {/* Reports List */}
                <div className="report-list-scroll">
                  {filteredReports.map(report => {
                    const sla = getSLAStatus(report.slaDeadline)
-                   const categoryMeta = CATEGORY_CONFIG[report.category]
-                   const CategoryIcon = categoryMeta?.icon || MapPinIcon
                    return (
                      <div 
                        key={report.id} 
@@ -343,13 +210,7 @@ const Admin = () => {
                        onClick={() => setSelectedReport(report)}
                      >
                        <div className="report-list-thumb">
-                         {hasValidReportImage(report) ? (
-                           <img src={report.images[0]} alt="Issue" className="report-list-thumb-img" />
-                         ) : (
-                           <div className="admin-report-thumb-fallback" aria-label={`${categoryMeta?.label || 'Report'} image missing`}>
-                             <CategoryIcon size={20} />
-                           </div>
-                         )}
+                         <img src={getReportImage(report)} alt="report documentation" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = FALLBACK_IMAGES[report.category] || FALLBACK_IMAGES.default }} />
                        </div>
                        
                        <div className="list-item-content">
@@ -363,7 +224,14 @@ const Admin = () => {
                          </div>
                          <div className="list-item-bottom">
                             <span className={sla.class}>{sla.text}</span>
-                            <SeverityBadge severity={report.severity} />
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                               {report.supportersCount > 1 && (
+                                 <span className="text-xs px-2 py-1 rounded font-bold" style={{ backgroundColor: '#ef444420', color: '#ef4444' }}>
+                                   🔥 {report.supportersCount} Signals
+                                 </span>
+                               )}
+                               <SeverityBadge severity={report.severity} />
+                             </div>
                          </div>
                        </div>
                      </div>
@@ -371,9 +239,8 @@ const Admin = () => {
                  })}
                  {filteredReports.length === 0 && (
                    <div className="report-list-empty">
-                     <Filter size={24} />
-                     <p>No reports match current filters.</p>
-                     {activeFilterCount > 0 && <button className="clear-all-btn" onClick={clearAllFilters}>Clear filters</button>}
+                     <Clock size={24} />
+                     <p>No reports available.</p>
                    </div>
                  )}
                </div>
@@ -398,16 +265,7 @@ const Admin = () => {
                  <div className="detail-scroll">
                    {/* Visual Context */}
                    <div className="detail-image-block">
-                     {hasValidReportImage(selectedReport) ? (
-                       <img src={selectedReport.images[0]} alt="evidence" className="detail-evidence-img" />
-                     ) : (
-                       <div className="admin-detail-fallback" aria-label={`${CATEGORY_CONFIG[selectedReport.category]?.label || 'Report'} image missing`}>
-                         {(() => {
-                           const DetailIcon = CATEGORY_CONFIG[selectedReport.category]?.icon || MapPinIcon
-                           return <DetailIcon size={34} />
-                         })()}
-                       </div>
-                     )}
+                     <img src={getReportImage(selectedReport)} alt="evidence" className="detail-evidence-img" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { e.currentTarget.src = FALLBACK_IMAGES[selectedReport.category] || FALLBACK_IMAGES.default }} />
                      <div className="detail-image-badges">
                        <StatusBadge status={selectedReport.status} />
                        <SeverityBadge severity={selectedReport.severity} />
@@ -434,7 +292,14 @@ const Admin = () => {
                    
                    {/* Meta */}
                    <div className="detail-meta">
-                     <h3 className="text-lg font-semibold mb-2">{selectedReport.title}</h3>
+                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '8px' }}>
+                       <h3 className="text-lg font-semibold m-0">{selectedReport.title}</h3>
+                       {selectedReport.supportersCount > 1 && (
+                         <span className="text-xs px-2 py-1 rounded font-bold" style={{ backgroundColor: '#ef444420', color: '#ef4444', border: '1px solid #ef444450' }}>
+                           🔥 {selectedReport.supportersCount} CITIZEN SIGNALS
+                         </span>
+                       )}
+                     </div>
                      <p className="detail-description">
                        {selectedReport.description || "No supplemental notes provided by citizen."}
                      </p>

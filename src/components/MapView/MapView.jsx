@@ -4,9 +4,10 @@ import L from 'leaflet'
 import './MapView.css'
 
 // Custom marker icons
-const createIcon = (color) => L.divIcon({
+const createIcon = (color, supportersCount = 1) => L.divIcon({
   className: 'custom-marker',
   html: `<div class="marker-pin" style="--marker-color: ${color}">
+    ${supportersCount > 1 ? `<div class="marker-signals-badge">${supportersCount}</div>` : ''}
     <div class="marker-pulse"></div>
     <div class="marker-dot"></div>
   </div>`,
@@ -94,7 +95,8 @@ const MapView = ({
       icon: createIcon(
         colorBy === 'severity'
           ? SEVERITY_COLORS[report.severity] || '#f59e0b'
-          : STATUS_COLORS[report.status] || '#f59e0b'
+          : STATUS_COLORS[report.status] || '#f59e0b',
+        report.supportersCount
       ),
     }))
   }, [reports, colorBy])
@@ -168,6 +170,11 @@ const MapView = ({
                   >
                     {report.severity}
                   </span>
+                  {report.supportersCount > 1 && (
+                    <span className="badge" style={{ backgroundColor: '#ef444420', color: '#ef4444', borderColor: '#ef444440' }}>
+                      {report.supportersCount} Signals
+                    </span>
+                  )}
                 </div>
               </div>
             </Popup>

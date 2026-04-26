@@ -1,34 +1,17 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ClipboardList, Bot, CheckCircle, AlertTriangle, MapPin } from 'lucide-react'
 import useStore from '../../store/useStore'
 import logoImg from '../../assets/logo.png'
 import './Header.css'
 
-const formatRelativeTime = (dateValue) => {
-  const date = new Date(dateValue)
-  if (Number.isNaN(date.getTime())) return 'now'
-
-  const diffMs = Date.now() - date.getTime()
-  const minutes = Math.max(1, Math.floor(diffMs / 60000))
-
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
-
 const Header = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { isAuthenticated, user, userRole, logout, reports, districtAdmins } = useStore()
+  const { isAuthenticated, user, userRole, logout } = useStore()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [readNotifIds, setReadNotifIds] = useState([])
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20)
@@ -38,14 +21,12 @@ const Header = () => {
 
   useEffect(() => {
     setMenuOpen(false)
-    setNotifOpen(false)
     setProfileOpen(false)
   }, [location])
 
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (!e.target.closest('.notif-wrapper') && !e.target.closest('.profile-wrapper')) {
-        setNotifOpen(false)
+      if (!e.target.closest('.profile-wrapper')) {
         setProfileOpen(false)
       }
     }
@@ -56,145 +37,6 @@ const Header = () => {
   const handleLogout = () => {
     logout()
     navigate('/')
-  }
-
-  const adminBasePath = userRole === 'super_admin' ? '/admin/super' : '/admin/district'
-
-  const actionNotifications = useMemo(() => {
-    if (!isAuthenticated) return []
-
-    const activeReports = Array.isArray(reports) ? reports : []
-    const notifications = []
-    const now = Date.now()
-
-    if (['super_admin', 'district_admin'].includes(userRole)) {
-      const unresolvedCritical = activeReports.filter((r) => r.severity === 'critical' && r.status !== 'resolved')
-      if (unresolvedCritical.length > 0) {
-        notifications.push({
-          id: 'admin-critical',
-          type: 'alert',
-          message: `${unresolvedCritical.length} critical issue${unresolvedCritical.length > 1 ? 's' : ''} need immediate attention.`,
-          time: formatRelativeTime(unresolvedCritical[0]?.updatedAt || unresolvedCritical[0]?.createdAt),
-          actionPath: `${adminBasePath}?severity=critical`,
-        })
-      }
-
-      const pendingReports = activeReports.filter((r) => r.status === 'pending')
-      if (pendingReports.length > 0) {
-        notifications.push({
-          id: 'admin-pending',
-          type: 'update',
-          message: `${pendingReports.length} report${pendingReports.length > 1 ? 's' : ''} pending verification.`,
-          time: formatRelativeTime(pendingReports[0]?.createdAt),
-          actionPath: `${adminBasePath}?status=pending`,
-        })
-      }
-
-      const slaBreached = activeReports.filter((r) => r.status !== 'resolved' && new Date(r.slaDeadline).getTime() < now)
-      if (slaBreached.length > 0) {
-        notifications.push({
-          id: 'admin-sla-breach',
-          type: 'alert',
-          message: `${slaBreached.length} report${slaBreached.length > 1 ? 's have' : ' has'} breached SLA deadline.`,
-          time: formatRelativeTime(slaBreached[0]?.slaDeadline),
-          actionPath: `${adminBasePath}?status=pending`,
-        })
-      }
-
-      const verificationQueue = activeReports.filter((r) => r.status === 'verified')
-      if (verificationQueue.length > 0) {
-        notifications.push({
-          id: 'admin-verified',
-          type: 'status',
-          message: `${verificationQueue.length} verified report${verificationQueue.length > 1 ? 's' : ''} awaiting assignment.`,
-          time: formatRelativeTime(verificationQueue[0]?.updatedAt || verificationQueue[0]?.createdAt),
-          actionPath: `${adminBasePath}?status=verified`,
-        })
-      }
-
-      const assignedReports = activeReports.filter((r) => r.status === 'assigned')
-      if (assignedReports.length > 0) {
-        notifications.push({
-          id: 'admin-assigned',
-          type: 'status',
-          message: `${assignedReports.length} report${assignedReports.length > 1 ? 's' : ''} assigned and awaiting resolution.`,
-          time: formatRelativeTime(assignedReports[0]?.updatedAt || assignedReports[0]?.createdAt),
-          actionPath: `${adminBasePath}?status=assigned`,
-        })
-      }
-
-      if (userRole === 'super_admin') {
-        const inactiveAdmins = (districtAdmins || []).filter((admin) => admin.status !== 'active')
-        if (inactiveAdmins.length > 0) {
-          notifications.push({
-            id: 'super-inactive-admins',
-            type: 'alert',
-            message: `${inactiveAdmins.length} district admin account${inactiveAdmins.length > 1 ? 's are' : ' is'} inactive.`,
-            time: 'now',
-            actionPath: '/admin/super#directory',
-          })
-        }
-      }
-    } else {
-      const assigned = activeReports.filter((r) => r.status === 'assigned')
-      if (assigned.length > 0) {
-        notifications.push({
-          id: `citizen-assigned-${assigned[0].id}`,
-          type: 'status',
-          message: `Your report ${assigned[0].id} has been assigned to a field team.`,
-          time: formatRelativeTime(assigned[0].updatedAt || assigned[0].createdAt),
-          actionPath: '/dashboard',
-        })
-      }
-
-      const resolved = activeReports.filter((r) => r.status === 'resolved')
-      if (resolved.length > 0) {
-        notifications.push({
-          id: `citizen-resolved-${resolved[0].id}`,
-          type: 'resolved',
-          message: `Report ${resolved[0].id} was resolved. Tap to review details.`,
-          time: formatRelativeTime(resolved[0].updatedAt || resolved[0].createdAt),
-          actionPath: '/dashboard',
-        })
-      }
-
-      const pending = activeReports.filter((r) => r.status === 'pending')
-      if (pending.length > 0) {
-        notifications.push({
-          id: `citizen-pending-${pending[0].id}`,
-          type: 'update',
-          message: `Report ${pending[0].id} is pending verification by district control room.`,
-          time: formatRelativeTime(pending[0].createdAt),
-          actionPath: '/dashboard',
-        })
-      }
-    }
-
-    if (notifications.length === 0) {
-      notifications.push({
-        id: 'system-clear',
-        type: 'resolved',
-        message: 'No pending alerts right now. Operations are stable.',
-        time: 'now',
-        actionPath: null,
-      })
-    }
-
-    return notifications.slice(0, 8).map((notif) => ({
-      ...notif,
-      read: readNotifIds.includes(notif.id),
-    }))
-  }, [isAuthenticated, reports, districtAdmins, userRole, readNotifIds, adminBasePath])
-
-  const unreadCount = actionNotifications.filter((n) => !n.read).length
-
-  const handleNotificationClick = (notif) => {
-    setReadNotifIds((prev) => (prev.includes(notif.id) ? prev : [...prev, notif.id]))
-    setNotifOpen(false)
-
-    if (notif.actionPath) {
-      navigate(notif.actionPath)
-    }
   }
 
   const navLinks = isAuthenticated ? (
@@ -262,64 +104,10 @@ const Header = () => {
         <div className="header-actions">
           {isAuthenticated && (
             <>
-              <div className="notif-wrapper">
-                <button
-                  className="btn-icon header-icon-btn"
-                  onClick={() => { setNotifOpen(!notifOpen); setProfileOpen(false) }}
-                  id="notification-bell"
-                  aria-label="Notifications"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                  </svg>
-                  {unreadCount > 0 && <span className="notif-badge">{unreadCount}</span>}
-                </button>
-
-                <AnimatePresence>
-                  {notifOpen && (
-                    <motion.div
-                      className="notif-dropdown glass-panel"
-                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      <div className="notif-header" style={{ borderBottom: '1px solid var(--signal-cyan)' }}>
-                        <span className="text-mono" style={{ color: 'var(--signal-cyan)', fontWeight: 'bold' }}>
-                          ACTION CENTER
-                        </span>
-                        <span className="badge badge-pending"><span className="badge-dot"></span>{unreadCount} new</span>
-                      </div>
-                      <div className="notif-list">
-                        {actionNotifications.map((notif) => (
-                          <div
-                            key={notif.id}
-                            className={`notif-item ${!notif.read ? 'notif-unread' : ''} notif-item-action`}
-                            onClick={() => handleNotificationClick(notif)}
-                          >
-                            <div className={`notif-icon-wrap notif-${notif.type}`}>
-                              {notif.type === 'status' && <ClipboardList size={20} />}
-                              {notif.type === 'update' && <Bot size={20} />}
-                              {notif.type === 'resolved' && <CheckCircle size={20} />}
-                              {notif.type === 'alert' && <AlertTriangle size={20} />}
-                            </div>
-                            <div className="notif-content">
-                              <p>{notif.message}</p>
-                              <span className="notif-time">{notif.time} • View</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
               <div className="profile-wrapper">
                 <button
                   className="profile-btn"
-                  onClick={() => { setProfileOpen(!profileOpen); setNotifOpen(false) }}
+                  onClick={() => { setProfileOpen(!profileOpen) }}
                   id="profile-menu"
                 >
                   {['district_admin', 'super_admin'].includes(userRole) ? (

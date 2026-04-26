@@ -88,6 +88,13 @@
   align-items: start;
 }
 
+.admin-ann-lists {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
 /* Composer Card */
 .admin-ann-composer {
   position: sticky;

@@ -214,13 +214,6 @@ const MOCK_REPORTS = [
   },
 ]
 
-const MOCK_NOTIFICATIONS = [
-  { id: 1, type: 'status', message: 'Your report RW-2026-0001 has been assigned to a field team.', time: '2h ago', read: false },
-  { id: 2, type: 'update', message: 'AI validation complete for your submission. Confidence: 94%', time: '5h ago', read: false },
-  { id: 3, type: 'resolved', message: 'Report RW-2026-0005 has been resolved! Thank you.', time: '1d ago', read: true },
-  { id: 4, type: 'alert', message: 'New critical issue reported near your area.', time: '2d ago', read: true },
-]
-
 const DISTRICTS = [
   { id: 'coimbatore', name: 'Coimbatore', admin: 'Rajesh Kumar', totalIssues: 156, resolved: 134, pending: 12, assigned: 10, avgResolution: '4.2 days' },
   { id: 'erode', name: 'Erode', admin: 'Sunita Devi', totalIssues: 203, resolved: 178, pending: 15, assigned: 10, avgResolution: '3.8 days' },
@@ -634,6 +627,31 @@ const useStore = create((set, get) => ({
     })
   },
 
+  checkSimilarReports: async ({ category, location, radiusKm = 0.2 }) => {
+    const token = get().token
+    if (!token || !category || !location?.lat || !location?.lng) return []
+
+    const params = new URLSearchParams()
+    params.set('scope', 'map')
+    params.set('lat', String(location.lat))
+    params.set('lng', String(location.lng))
+    params.set('radiusKm', String(radiusKm))
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/reports?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (!response.ok) return []
+
+      return (data.reports || []).filter(
+        (r) => r.category === category && r.status !== 'resolved' && r.status !== 'rejected'
+      )
+    } catch {
+      return []
+    }
+  },
+
   createReport: async (payload) => {
     const token = get().token
     const response = await fetch(`${API_BASE_URL}/api/reports`, {
@@ -650,11 +668,43 @@ const useStore = create((set, get) => ({
       throw new Error(data.message || 'Could not create report')
     }
 
-    set((state) => ({ reports: [data.report, ...state.reports] }))
+    set((state) => {
+      const existIndex = state.reports.findIndex(r => r.id === data.report.id)
+      if (existIndex > -1) {
+        // Replace existing natively (auto-merged support)
+        const updated = [...state.reports]
+        updated[existIndex] = data.report
+        return { reports: updated }
+      }
+      return { reports: [data.report, ...state.reports] }
+    })
+    
     return {
       report: data.report,
       relatedAnnouncements: data.relatedAnnouncements || [],
     }
+  },
+
+  supportReport: async (id) => {
+    const token = get().token
+    if (!token) throw new Error('Not authenticated')
+
+    const response = await fetch(`${API_BASE_URL}/api/reports/${id}/support`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not support report')
+    }
+
+    set((state) => ({
+      reports: state.reports.map((r) => (r.id === id ? data.report : r)),
+      selectedReport: state.selectedReport?.id === id ? data.report : state.selectedReport,
+    }))
+
+    return data.report
   },
 
   uploadReportMedia: async (file) => {
@@ -708,15 +758,6 @@ const useStore = create((set, get) => ({
 
     return data.report
   },
-
-  // Notifications
-  notifications: MOCK_NOTIFICATIONS,
-  unreadCount: MOCK_NOTIFICATIONS.filter(n => !n.read).length,
-
-  markNotificationRead: (id) => set(state => ({
-    notifications: state.notifications.map(n => n.id === id ? { ...n, read: true } : n),
-    unreadCount: state.notifications.filter(n => !n.read && n.id !== id).length,
-  })),
 
   // UI
   sidebarOpen: true,
@@ -780,7 +821,7 @@ const useStore = create((set, get) => ({
       avgAiConfidence: reports.length > 0 ? Math.round(reports.reduce((a, r) => a + r.aiConfidence, 0) / reports.length) : 0,
       totalResolved: reports.filter(r => r.status === 'resolved').length,
       totalReported: reports.length,
-      citizenCount: 0,
+      citizenCount: reports.reduce((acc, r) => acc + (r.supportersCount || 1), 0),
     }
   },
 }))

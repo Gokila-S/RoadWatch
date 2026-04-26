@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { AlertTriangle, BellRing, Wrench, MapPin, Clock4 } from 'lucide-react'
+import { Calendar, AlertTriangle, BellRing, Wrench, MapPin } from 'lucide-react'
 import useStore from '../../store/useStore'
 import './Announcements.css'
 
@@ -10,20 +10,7 @@ const CATEGORY_META = {
   maintenance: { label: 'Maintenance', icon: Wrench },
 }
 
-const formatTimeLeft = (expiresAt) => {
-  const end = new Date(expiresAt)
-  const now = new Date()
-  const diffMs = end - now
 
-  if (diffMs <= 0) return 'Expired'
-
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-  if (diffHours < 1) return 'Ends in <1 hour'
-  if (diffHours < 24) return `Ends in ${diffHours} hours`
-
-  const days = Math.floor(diffHours / 24)
-  return `Ends in ${days} day${days > 1 ? 's' : ''}`
-}
 
 const Announcements = () => {
   const {
@@ -92,7 +79,6 @@ const Announcements = () => {
                 <strong>{item.title}</strong>
               </div>
               <p>{item.message}</p>
-              <span>{formatTimeLeft(item.expiresAt)}</span>
             </article>
           ))}
         </section>
@@ -109,25 +95,32 @@ const Announcements = () => {
             return (
               <motion.article
                 key={item.id}
-                className="announcement-card"
+                className={`announcement-list-item priority-${item.priority}`}
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <div className="announcement-card-head">
-                  <div className="announcement-type">
-                    <CategoryIcon size={16} />
-                    <span>{CATEGORY_META[item.category]?.label || 'Update'}</span>
-                  </div>
-                  <span className={`announcement-priority-tag ${item.priority}`}>{item.priority}</span>
+                <div className="announcement-item-icon">
+                  <CategoryIcon size={20} />
                 </div>
-
-                <h3>{item.title}</h3>
-                <p>{item.message}</p>
-
-                <div className="announcement-card-meta">
-                  <span><MapPin size={14} /> {item.ward || item.district}</span>
-                  <span><Clock4 size={14} /> {formatTimeLeft(item.expiresAt)}</span>
+                
+                <div className="announcement-item-content">
+                  <div className="announcement-item-header">
+                    <h3>{item.title}</h3>
+                    <span className={`announcement-priority-badge ${item.priority}`}>
+                      {item.priority.toUpperCase()}
+                    </span>
+                  </div>
+                  
+                  <p className="announcement-item-message">{item.message}</p>
+                  
+                  <div className="announcement-item-footer">
+                    <span className="announcement-meta-tag"><Calendar size={12} /> {new Date(item.createdAt).toLocaleDateString()}</span>
+                    <span className="announcement-meta-tag"><MapPin size={12} /> {item.district}</span>
+                    <span className="announcement-meta-tag meta-category">
+                      {CATEGORY_META[item.category]?.label || 'General Update'}
+                    </span>
+                  </div>
                 </div>
               </motion.article>
             )

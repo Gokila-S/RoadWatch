@@ -23,6 +23,8 @@ const mapReportRow = (row) => ({
   createdAt: row.created_at,
   updatedAt: row.updated_at,
   slaDeadline: row.sla_deadline,
+  supportersCount: row.supporters ? Math.max(1, row.supporters.length) : 1,
+  supporters: row.supporters || [],
 })
 
 const mapAnnouncementRow = (row) => ({
@@ -80,7 +82,7 @@ export const listReports = async (req, res, next) => {
 
     if (req.user.role === 'citizen' && !wantsCitizenMapScope) {
       values.push(req.user.sub)
-      filters.push(`r.reported_by = $${values.length}`)
+      filters.push(`(r.reported_by = $${values.length} OR $${values.length} = ANY(r.supporters))`)
     }
 
     if (req.user.role === 'district_admin') {
@@ -98,7 +100,7 @@ export const listReports = async (req, res, next) => {
         r.id, r.title, r.description, r.category, r.severity, r.status, r.district,
         r.location_lat, r.location_lng, r.location_address,
         r.reported_by, r.assigned_to, r.ai_confidence, r.images, r.resolution,
-        r.created_at, r.updated_at, r.sla_deadline,
+        r.created_at, r.updated_at, r.sla_deadline, r.supporters,
         reporter.full_name AS reporter_name
       FROM reports r
       JOIN profiles reporter ON reporter.id = r.reported_by
@@ -120,12 +122,8 @@ export const listReports = async (req, res, next) => {
       : mappedReports
 
     if (wantsCitizenMapScope) {
-      const boundedRadius = Number.isFinite(requestedRadiusKm) ? Math.max(1, Math.min(300, requestedRadiusKm)) : 100
+      const boundedRadius = Number.isFinite(requestedRadiusKm) ? Math.max(0.01, Math.min(300, requestedRadiusKm)) : 100
       const filteredReports = districtScopedReports.filter((report) => {
-        if (report.reportedBy === req.user.sub) {
-          return true
-        }
-
         const latValue = Number(report.location?.lat)
         const lngValue = Number(report.location?.lng)
         if (!Number.isFinite(latValue) || !Number.isFinite(lngValue)) {
@@ -236,8 +234,58 @@ export const createReport = async (req, res, next) => {
       (mediaResult.rows.reduce((sum, media) => sum + Number(media.ai_confidence || 0), 0) / mediaResult.rows.length) * 100,
     )
 
-    const countResult = await client.query("SELECT COUNT(*)::int AS total FROM reports WHERE id LIKE 'RW-%'")
-    const serial = String(countResult.rows[0].total + 1).padStart(4, '0')
+    // AUTO-MERGE DUPLICATES BEHAVIOR
+    const mergeCheck = await client.query(
+      `SELECT id, location_lat, location_lng FROM reports
+       WHERE category = $1
+       AND district = $2
+       AND status NOT IN ('resolved', 'rejected')
+       AND NOT ($3 = ANY(supporters))`,
+      [category, district.trim(), req.user.sub]
+    )
+
+    let mergeTargetId = null
+    for (const r of mergeCheck.rows) {
+      if (calculateDistanceKm(lat, lng, Number(r.location_lat), Number(r.location_lng)) <= 0.1) {
+        mergeTargetId = r.id
+        break
+      }
+    }
+
+    if (mergeTargetId) {
+      const update = await client.query(
+        `UPDATE reports
+         SET supporters = array_append(supporters, $1),
+             updated_at = NOW()
+         WHERE id = $2
+         RETURNING *`,
+        [req.user.sub, mergeTargetId]
+      )
+      
+      const mergedReport = update.rows[0]
+      const mergeReporter = await client.query('SELECT full_name FROM profiles WHERE id = $1', [mergedReport.reported_by])
+      
+      await client.query(
+        `
+        UPDATE report_media_uploads
+        SET report_id = $1
+        WHERE id = ANY($2::uuid[])
+        `,
+        [mergeTargetId, normalizedMediaIds],
+      )
+
+      await client.query('COMMIT')
+      inTransaction = false
+
+      return res.status(200).json({
+        message: 'Your report was automatically merged into an identical nearby issue!',
+        report: mapReportRow({ ...mergedReport, reporter_name: mergeReporter.rows[0]?.full_name || 'Citizen' }),
+        relatedAnnouncements: [],
+      })
+    }
+
+    const maxResult = await client.query("SELECT COALESCE(MAX(SUBSTRING(id FROM 9)::int), 0) AS max_val FROM reports WHERE id LIKE 'RW-2026-%'")
+    const serial = String(maxResult.rows[0].max_val + 1).padStart(4, '0')
     const reportId = `RW-2026-${serial}`
 
     const insert = await client.query(
@@ -245,9 +293,9 @@ export const createReport = async (req, res, next) => {
       INSERT INTO reports (
         id, title, description, category, severity, status, district,
         location_lat, location_lng, location_address,
-        reported_by, ai_confidence, images, sla_deadline
+        reported_by, ai_confidence, images, sla_deadline, supporters
       )
-      VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12, NOW() + ($13 || ' hour')::interval)
+      VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10, $11, $12, NOW() + ($13 || ' hour')::interval, ARRAY[$10]::uuid[])
       RETURNING *
       `,
       [
@@ -386,6 +434,41 @@ export const updateReportStatus = async (req, res, next) => {
 
     return res.json({
       message: 'Report status updated',
+      report: mapReportRow({ ...update.rows[0], reporter_name: reporter.rows[0]?.full_name || 'Citizen' }),
+    })
+  } catch (error) {
+    return next(error)
+  }
+}
+
+export const supportReport = async (req, res, next) => {
+  try {
+    const { id } = req.params
+    const userId = req.user.sub
+
+    if (req.user.role !== 'citizen') {
+      return res.status(403).json({ message: 'Only citizens can support existing reports' })
+    }
+
+    const update = await pool.query(
+      `
+      UPDATE reports
+      SET supporters = array_append(array_remove(supporters, $1), $1),
+          updated_at = NOW()
+      WHERE id = $2
+      RETURNING *
+      `,
+      [userId, id],
+    )
+
+    if (update.rowCount === 0) {
+      return res.status(404).json({ message: 'Report not found' })
+    }
+
+    const reporter = await pool.query('SELECT full_name FROM profiles WHERE id = $1', [update.rows[0].reported_by])
+
+    return res.json({
+      message: 'You are now supporting this report',
       report: mapReportRow({ ...update.rows[0], reporter_name: reporter.rows[0]?.full_name || 'Citizen' }),
     })
   } catch (error) {
