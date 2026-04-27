@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Camera, MapPin, CheckCircle2, ChevronRight, AlertTriangle, CloudRain, Construction, MapPinOff, ScanSearch, BellRing } from 'lucide-react'
+import { Camera, MapPin, CheckCircle2, ChevronRight, AlertTriangle, CloudRain, Construction, MapPinOff, ScanSearch, BellRing, RotateCcw } from 'lucide-react'
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
 import './Report.css'
@@ -619,7 +619,8 @@ const Report = () => {
                       </p>
                       {locationError ? <p className="location-warning">{locationError}</p> : null}
                       <button type="button" className="capture-option-btn location-actions" onClick={fetchCurrentLocation}>
-                        Refresh Location
+                        <RotateCcw size={14} className={locationLoading ? 'animate-spin' : ''} />
+                        {locationLoading ? 'Updating...' : 'Refresh Location'}
                       </button>
                     </div>
                     {/* Rendered Map Background Style */}

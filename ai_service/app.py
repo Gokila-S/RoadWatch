@@ -52,6 +52,17 @@ def load_keras_model():
         import tensorflow as tf
         logger.info("Using Keras %s with TensorFlow backend %s", keras.__version__, tf.__version__)
 
+        # ── Patch for quantization_config compatibility ──────────────────────────
+        # Newer Keras versions might include 'quantization_config' in serialized 
+        # layers which older/different versions don't recognize.
+        from keras.layers import Dense
+        original_init = Dense.__init__
+        def patched_init(self, *args, **kwargs):
+            kwargs.pop('quantization_config', None)
+            return original_init(self, *args, **kwargs)
+        Dense.__init__ = patched_init
+        # ────────────────────────────────────────────────────────────────────────
+
         model = keras.models.load_model(MODEL_PATH)
         logger.info("✅ Model loaded successfully from %s", MODEL_PATH)
         return True
