@@ -50,6 +50,14 @@ def load_keras_model():
         # Import TensorFlow here so the app can still start even if TF isn't
         # installed — the /predict route will return a clear error in that case.
         import tensorflow as tf
+        
+        # Monkey-patch Dense.__init__ to ignore 'quantization_config' when loading older models
+        original_init = tf.keras.layers.Dense.__init__
+        def patched_init(self, *args, **kwargs):
+            kwargs.pop('quantization_config', None)
+            original_init(self, *args, **kwargs)
+        tf.keras.layers.Dense.__init__ = patched_init
+
         model = tf.keras.models.load_model(MODEL_PATH)
         logger.info("✅ Model loaded successfully from %s", MODEL_PATH)
         return True

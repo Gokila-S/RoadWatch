@@ -53,85 +53,28 @@ const Report = () => {
   const shouldDisableDeploy = isSupportingIssue || similarReports.length > 0
 
   const analyzeRoadLikelihood = async (file) => {
-    const objectUrl = URL.createObjectURL(file)
-
+    const formData = new FormData();
+    formData.append("image", file);
     try {
-      const image = await new Promise((resolve, reject) => {
-        const img = new Image()
-        img.onload = () => resolve(img)
-        img.onerror = () => reject(new Error('Could not read selected image'))
-        img.src = objectUrl
-      })
-
-      const canvas = document.createElement('canvas')
-      const width = 96
-      const height = 96
-      canvas.width = width
-      canvas.height = height
-
-      const ctx = canvas.getContext('2d', { willReadFrequently: true })
-      if (!ctx) {
-        throw new Error('Image analysis is unavailable')
+      const response = await fetch("http://127.0.0.1:5000/predict", {
+        method: "POST",
+        body: formData,
+      });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return { score: 0, rejected: true, raw: null, isError: true, errorMessage: errorData.error || `Server Error ${response.status}` };
       }
-
-      ctx.drawImage(image, 0, 0, width, height)
-      const { data } = ctx.getImageData(0, 0, width, height)
-
-      let grayLikeCount = 0
-      let midLumaCount = 0
-      let strongEdges = 0
-      const luma = new Float32Array(width * height)
-
-      for (let i = 0, p = 0; i < data.length; i += 4, p += 1) {
-        const r = data[i]
-        const g = data[i + 1]
-        const b = data[i + 2]
-
-        const max = Math.max(r, g, b)
-        const min = Math.min(r, g, b)
-        const sat = max === 0 ? 0 : (max - min) / max
-        const y = 0.2126 * r + 0.7152 * g + 0.0722 * b
-
-        if (sat < 0.25) grayLikeCount += 1
-        if (y > 40 && y < 205) midLumaCount += 1
-        luma[p] = y
-      }
-
-      for (let y = 0; y < height - 1; y += 1) {
-        for (let x = 0; x < width - 1; x += 1) {
-          const idx = y * width + x
-          const dx = Math.abs(luma[idx] - luma[idx + 1])
-          const dy = Math.abs(luma[idx] - luma[idx + width])
-          if (dx > 18 || dy > 18) strongEdges += 1
-        }
-      }
-
-      const totalPixels = width * height
-      const grayRatio = grayLikeCount / totalPixels
-      const midLumaRatio = midLumaCount / totalPixels
-      const edgeDensity = strongEdges / ((width - 1) * (height - 1))
-      const normalizedEdges = Math.min(1, edgeDensity / 0.2)
-
-      const score = Math.round((grayRatio * 0.42 + midLumaRatio * 0.33 + normalizedEdges * 0.25) * 100)
-      return Math.max(0, Math.min(100, score))
-    } finally {
-      URL.revokeObjectURL(objectUrl)
+      const data = await response.json();
+      return { 
+        score: Math.round(data.confidence * 100), 
+        rejected: !data.store_in_db,
+        raw: data,
+        isError: false
+      };
+    } catch (err) {
+      console.error("AI Service Error:", err);
+      return { score: 0, rejected: true, raw: null, isError: true, errorMessage: err.message };
     }
-  }
-
-  const estimateCategoryConfidence = (category, baseRoadScore) => {
-    const categoryBase = {
-      pothole: 72,
-      crack: 70,
-      waterlogging: 68,
-      hazard: 66,
-    }
-
-    const base = categoryBase[category] || 62
-    const roadFactor = ((baseRoadScore || 55) - 50) * 0.65
-    const variation = Math.random() * 24 - 12
-
-    return Math.max(30, Math.min(98, Math.round(base + roadFactor + variation)))
   }
 
   const stopCameraStream = () => {
@@ -253,12 +196,17 @@ const Report = () => {
     setRoadScanChecking(true)
 
     try {
-      const roadScore = await analyzeRoadLikelihood(file)
-      if (roadScore < 45) {
-        setRoadImageScore(roadScore)
+      const aiResult = await analyzeRoadLikelihood(file)
+      if (aiResult.isError) {
+        setSubmitError(`AI Service Error: ${aiResult.errorMessage}. Please ensure the Python backend is running properly.`);
+        setRoadScanChecking(false);
+        return false;
+      }
+      if (aiResult.rejected) {
+        setRoadImageScore(aiResult.score)
         setAiData(null)
         setFormData((prev) => ({ ...prev, category: '', severity: '' }))
-        setSubmitError('Image rejected: it does not appear to be a road surface. Please upload a road-related image.')
+        setSubmitError(`AI Rejected: Image does not appear to show road damage (Confidence: ${aiResult.score}%). Please upload a valid image.`)
         return false
       }
 
@@ -267,10 +215,15 @@ const Report = () => {
       }
 
       const previewUrl = URL.createObjectURL(file)
-      setRoadImageScore(roadScore)
+      setRoadImageScore(aiResult.score)
       setImage(previewUrl)
       setImageFile(file)
-      setAiData(null)
+      setAiData({
+        category: aiResult.raw.prediction,
+        confidence: aiResult.score,
+        rejected: false,
+        summary: 'Road damage confidently verified by AI model.',
+      })
       setStep(2)
       return true
     } catch {
@@ -376,35 +329,18 @@ const Report = () => {
     }
 
     if (!AI_SCAN_SUPPORTED_CATEGORIES.includes(formData.category)) {
-      setAiData(null)
       setAnalyzing(false)
       return
     }
 
-    setAiData(null)
     setAnalyzing(true)
 
     const timer = setTimeout(() => {
-      const confidence = estimateCategoryConfidence(formData.category, roadImageScore)
-      const rejected = confidence < MIN_CATEGORY_CONFIDENCE
-      setAiData({
-        category: formData.category,
-        confidence,
-        rejected,
-        summary: rejected
-          ? `Confidence ${confidence}% is below required threshold (${MIN_CATEGORY_CONFIDENCE}%).`
-          : 'Surface issue pattern identified from uploaded evidence.',
-      })
-      if (rejected) {
-        setSubmitError(`AI rejected this category match (${confidence}%). Please recapture image or choose correct category.`)
-      } else {
-        setSubmitError('')
-      }
       setAnalyzing(false)
-    }, 1500)
+    }, 600)
 
     return () => clearTimeout(timer)
-  }, [step, imageFile, formData.category, roadImageScore])
+  }, [step, imageFile, formData.category])
 
   useEffect(() => {
     if (!formData.category || !locationReady || step !== 2) {
@@ -555,8 +491,10 @@ const Report = () => {
                     {cameraReady ? 'TAP TO CAPTURE PHOTO' : 'OPEN CAMERA OR UPLOAD'}
                   </p>
                   {cameraError ? <p className="camera-warning">{cameraError}</p> : null}
+                  {submitError ? <p className="text-sm mt-4 text-center font-semibold" style={{ color: '#ff6b6b', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{submitError}</p> : null}
+                  {roadScanChecking ? <p className="text-sm mt-4 text-center font-semibold text-signal-cyan" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>Analyzing image via AI...</p> : null}
 
-                  <div className="camera-actions">
+                  <div className="camera-actions mt-4">
                     <button type="button" className="capture-option-btn" onClick={handleCameraClick}>
                       {cameraReady ? 'Capture Now' : 'Use Camera'}
                     </button>

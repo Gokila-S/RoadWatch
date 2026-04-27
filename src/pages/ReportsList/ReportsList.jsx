@@ -97,6 +97,9 @@ const ReportsList = () => {
   const [confidenceRange, setConfidenceRange] = useState([0, 100])
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [showSortDropdown, setShowSortDropdown] = useState(false)
+  const [collapsedSections, setCollapsedSections] = useState({})
+  
+  const toggleSection = (key) => setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }))
   
   // Side Panel State
   const [selectedReport, setSelectedReport] = useState(null)
@@ -409,172 +412,198 @@ const ReportsList = () => {
           <div className="sidebar-filters-scroll">
             {/* STATUS */}
             <div className="filter-section">
-              <h4 className="filter-section-label">Status</h4>
-              <div className="filter-chips-grid">
-                {STATUS_OPTIONS.map(opt => (
-                  <button 
-                    key={opt.id}
-                    className={`filter-chip-v2 ${statusFilter === opt.id ? 'chip-active' : ''}`}
-                    onClick={() => setStatusFilter(statusFilter === opt.id ? 'all' : opt.id)}
-                    style={{ '--chip-color': opt.color }}
-                  >
-                    <span className="chip-indicator" style={{ background: opt.color }}></span>
-                    {opt.label}
-                    {statusFilter === opt.id && <CheckCircle2 size={13} className="chip-check" />}
-                  </button>
-                ))}
-              </div>
+              <h4 className="filter-section-label collapsive-label" onClick={() => toggleSection('status')}>
+                <span>Status</span>
+                <ChevronDown size={14} className={`collapse-icon ${collapsedSections.status ? 'collapsed' : ''}`} />
+              </h4>
+              {!collapsedSections.status && (
+                <div className="filter-chips-grid">
+                  {STATUS_OPTIONS.map(opt => (
+                    <button 
+                      key={opt.id}
+                      className={`filter-chip-v2 ${statusFilter === opt.id ? 'chip-active' : ''}`}
+                      onClick={() => setStatusFilter(statusFilter === opt.id ? 'all' : opt.id)}
+                    >
+                      {opt.label}
+                      {statusFilter === opt.id && <CheckCircle2 size={13} className="chip-check" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* SEVERITY */}
             <div className="filter-section">
-              <h4 className="filter-section-label">Severity</h4>
-              <div className="filter-chips-grid">
-                {SEVERITY_OPTIONS.map(opt => (
-                  <button 
-                    key={opt.id}
-                    className={`filter-chip-v2 ${severityFilter === opt.id ? 'chip-active' : ''}`}
-                    onClick={() => setSeverityFilter(severityFilter === opt.id ? 'all' : opt.id)}
-                    style={{ '--chip-color': opt.color }}
-                  >
-                    <span className="chip-indicator" style={{ background: opt.color }}></span>
-                    {opt.label}
-                    {severityFilter === opt.id && <CheckCircle2 size={13} className="chip-check" />}
-                  </button>
-                ))}
-              </div>
+              <h4 className="filter-section-label collapsive-label" onClick={() => toggleSection('severity')}>
+                <span>Severity</span>
+                <ChevronDown size={14} className={`collapse-icon ${collapsedSections.severity ? 'collapsed' : ''}`} />
+              </h4>
+              {!collapsedSections.severity && (
+                <div className="filter-chips-grid">
+                  {SEVERITY_OPTIONS.map(opt => (
+                    <button 
+                      key={opt.id}
+                      className={`filter-chip-v2 ${severityFilter === opt.id ? 'chip-active' : ''}`}
+                      onClick={() => setSeverityFilter(severityFilter === opt.id ? 'all' : opt.id)}
+                    >
+                      {opt.label}
+                      {severityFilter === opt.id && <CheckCircle2 size={13} className="chip-check" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* ISSUE TYPE */}
             <div className="filter-section">
-              <h4 className="filter-section-label">Issue Type</h4>
-              <div className="filter-chips-grid">
-                {Object.entries(CATEGORY_CONFIG).map(([id, cfg]) => {
-                  const Icon = cfg.icon
-                  return (
-                    <button 
-                      key={id}
-                      className={`filter-chip-v2 chip-with-icon ${categoryFilter === id ? 'chip-active' : ''}`}
-                      onClick={() => setCategoryFilter(categoryFilter === id ? 'all' : id)}
-                      style={{ '--chip-color': cfg.color }}
-                    >
-                      <Icon size={13} />
-                      {cfg.label}
-                      {categoryFilter === id && <CheckCircle2 size={13} className="chip-check" />}
-                    </button>
-                  )
-                })}
-              </div>
+              <h4 className="filter-section-label collapsive-label" onClick={() => toggleSection('category')}>
+                <span>Issue Type</span>
+                <ChevronDown size={14} className={`collapse-icon ${collapsedSections.category ? 'collapsed' : ''}`} />
+              </h4>
+              {!collapsedSections.category && (
+                <div className="filter-chips-grid">
+                  {Object.entries(CATEGORY_CONFIG).map(([id, cfg]) => {
+                    const Icon = cfg.icon
+                    return (
+                      <button 
+                        key={id}
+                        className={`filter-chip-v2 chip-with-icon ${categoryFilter === id ? 'chip-active' : ''}`}
+                        onClick={() => setCategoryFilter(categoryFilter === id ? 'all' : id)}
+                      >
+                        <Icon size={13} />
+                        {cfg.label}
+                        {categoryFilter === id && <CheckCircle2 size={13} className="chip-check" />}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
             {/* AI CONFIDENCE RANGE */}
             <div className="filter-section">
-              <h4 className="filter-section-label">AI Confidence</h4>
-              <div className="range-slider-block">
-                <div className="range-labels">
-                  <span className="range-value">{confidenceRange[0]}%</span>
-                  <span className="range-separator">to</span>
-                  <span className="range-value">{confidenceRange[1]}%</span>
+              <h4 className="filter-section-label collapsive-label" onClick={() => toggleSection('confidence')}>
+                <span>AI Confidence</span>
+                <ChevronDown size={14} className={`collapse-icon ${collapsedSections.confidence ? 'collapsed' : ''}`} />
+              </h4>
+              {!collapsedSections.confidence && (
+                <div className="range-slider-block">
+                  <div className="range-labels">
+                    <span className="range-value">{confidenceRange[0]}%</span>
+                    <span className="range-separator">to</span>
+                    <span className="range-value">{confidenceRange[1]}%</span>
+                  </div>
+                  <div className="dual-range-track">
+                    <input 
+                      type="range" 
+                      min="0" max="100" 
+                      value={confidenceRange[0]}
+                      onChange={(e) => {
+                        const val = Number(e.target.value)
+                        if (val <= confidenceRange[1]) setConfidenceRange([val, confidenceRange[1]])
+                      }}
+                      className="range-input range-min"
+                    />
+                    <input 
+                      type="range" 
+                      min="0" max="100" 
+                      value={confidenceRange[1]}
+                      onChange={(e) => {
+                        const val = Number(e.target.value)
+                        if (val >= confidenceRange[0]) setConfidenceRange([confidenceRange[0], val])
+                      }}
+                      className="range-input range-max"
+                    />
+                    <div 
+                      className="range-fill" 
+                      style={{ 
+                        left: `${confidenceRange[0]}%`, 
+                        width: `${confidenceRange[1] - confidenceRange[0]}%` 
+                      }}
+                    ></div>
+                  </div>
+                  <div className="range-presets">
+                    <button className={`range-preset ${confidenceRange[0] >= 90 ? 'preset-active' : ''}`} onClick={() => setConfidenceRange([90, 100])}>
+                      High (90%+)
+                    </button>
+                    <button className={`range-preset ${confidenceRange[0] >= 70 && confidenceRange[1] <= 90 ? 'preset-active' : ''}`} onClick={() => setConfidenceRange([70, 90])}>
+                      Mid (70-90%)
+                    </button>
+                    <button className={`range-preset ${confidenceRange[1] <= 70 ? 'preset-active' : ''}`} onClick={() => setConfidenceRange([0, 70])}>
+                      Low (&lt;70%)
+                    </button>
+                  </div>
                 </div>
-                <div className="dual-range-track">
-                  <input 
-                    type="range" 
-                    min="0" max="100" 
-                    value={confidenceRange[0]}
-                    onChange={(e) => {
-                      const val = Number(e.target.value)
-                      if (val <= confidenceRange[1]) setConfidenceRange([val, confidenceRange[1]])
-                    }}
-                    className="range-input range-min"
-                  />
-                  <input 
-                    type="range" 
-                    min="0" max="100" 
-                    value={confidenceRange[1]}
-                    onChange={(e) => {
-                      const val = Number(e.target.value)
-                      if (val >= confidenceRange[0]) setConfidenceRange([confidenceRange[0], val])
-                    }}
-                    className="range-input range-max"
-                  />
-                  <div 
-                    className="range-fill" 
-                    style={{ 
-                      left: `${confidenceRange[0]}%`, 
-                      width: `${confidenceRange[1] - confidenceRange[0]}%` 
-                    }}
-                  ></div>
-                </div>
-                <div className="range-presets">
-                  <button className={`range-preset ${confidenceRange[0] >= 90 ? 'preset-active' : ''}`} onClick={() => setConfidenceRange([90, 100])}>
-                    High (90%+)
-                  </button>
-                  <button className={`range-preset ${confidenceRange[0] >= 70 && confidenceRange[1] <= 90 ? 'preset-active' : ''}`} onClick={() => setConfidenceRange([70, 90])}>
-                    Mid (70-90%)
-                  </button>
-                  <button className={`range-preset ${confidenceRange[1] <= 70 ? 'preset-active' : ''}`} onClick={() => setConfidenceRange([0, 70])}>
-                    Low (&lt;70%)
-                  </button>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* SLA STATUS */}
             <div className="filter-section">
-              <h4 className="filter-section-label">SLA Status</h4>
-              <div className="filter-chips-grid">
-                {SLA_OPTIONS.map(opt => (
-                  <button 
-                    key={opt.id}
-                    className={`filter-chip-v2 ${slaFilter === opt.id ? 'chip-active' : ''}`}
-                    onClick={() => setSlaFilter(slaFilter === opt.id ? 'all' : opt.id)}
-                    style={{ '--chip-color': opt.color }}
-                  >
-                    <span className="chip-indicator" style={{ background: opt.color }}></span>
-                    {opt.label}
-                    {slaFilter === opt.id && <CheckCircle2 size={13} className="chip-check" />}
-                  </button>
-                ))}
-              </div>
+              <h4 className="filter-section-label collapsive-label" onClick={() => toggleSection('sla')}>
+                <span>SLA Status</span>
+                <ChevronDown size={14} className={`collapse-icon ${collapsedSections.sla ? 'collapsed' : ''}`} />
+              </h4>
+              {!collapsedSections.sla && (
+                <div className="filter-chips-grid">
+                  {SLA_OPTIONS.map(opt => (
+                    <button 
+                      key={opt.id}
+                      className={`filter-chip-v2 ${slaFilter === opt.id ? 'chip-active' : ''}`}
+                      onClick={() => setSlaFilter(slaFilter === opt.id ? 'all' : opt.id)}
+                    >
+                      {opt.label}
+                      {slaFilter === opt.id && <CheckCircle2 size={13} className="chip-check" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* TIMEFRAME */}
             <div className="filter-section">
-              <h4 className="filter-section-label">Timeframe</h4>
-              <div className="filter-chips-grid">
-                {DATE_OPTIONS.map(opt => (
-                  <button 
-                    key={opt.id}
-                    className={`filter-chip-v2 ${dateRange === opt.id ? 'chip-active' : ''}`}
-                    onClick={() => setDateRange(dateRange === opt.id ? 'all' : opt.id)}
-                    style={{ '--chip-color': '#9a9aab' }}
-                  >
-                    <Clock size={13} />
-                    {opt.label}
-                    {dateRange === opt.id && <CheckCircle2 size={13} className="chip-check" />}
-                  </button>
-                ))}
-              </div>
+              <h4 className="filter-section-label collapsive-label" onClick={() => toggleSection('timeframe')}>
+                <span>Timeframe</span>
+                <ChevronDown size={14} className={`collapse-icon ${collapsedSections.timeframe ? 'collapsed' : ''}`} />
+              </h4>
+              {!collapsedSections.timeframe && (
+                <div className="filter-chips-grid">
+                  {DATE_OPTIONS.map(opt => (
+                    <button 
+                      key={opt.id}
+                      className={`filter-chip-v2 ${dateRange === opt.id ? 'chip-active' : ''}`}
+                      onClick={() => setDateRange(dateRange === opt.id ? 'all' : opt.id)}
+                    >
+                      <Clock size={13} />
+                      {opt.label}
+                      {dateRange === opt.id && <CheckCircle2 size={13} className="chip-check" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* DISTRICT - Super Admin Only */}
             {user?.role === 'super_admin' && (
               <div className="filter-section">
-                <h4 className="filter-section-label">District</h4>
-                <div className="filter-chips-grid">
-                  {districtOptions.map(district => (
-                    <button
-                      key={district}
-                      className={`filter-chip-v2 ${districtFilter === district ? 'chip-active' : ''}`}
-                      onClick={() => setDistrictFilter(districtFilter === district ? 'all' : district)}
-                      style={{ '--chip-color': '#06b6d4' }}
-                    >
-                      <MapPin size={13} />
-                      {district}
-                      {districtFilter === district && <CheckCircle2 size={13} className="chip-check" />}
-                    </button>
-                  ))}
-                </div>
+                <h4 className="filter-section-label collapsive-label" onClick={() => toggleSection('district')}>
+                  <span>District</span>
+                  <ChevronDown size={14} className={`collapse-icon ${collapsedSections.district ? 'collapsed' : ''}`} />
+                </h4>
+                {!collapsedSections.district && (
+                  <div className="filter-chips-grid">
+                    {districtOptions.map(district => (
+                      <button
+                        key={district}
+                        className={`filter-chip-v2 ${districtFilter === district ? 'chip-active' : ''}`}
+                        onClick={() => setDistrictFilter(districtFilter === district ? 'all' : district)}
+                      >
+                        <MapPin size={13} />
+                        {district}
+                        {districtFilter === district && <CheckCircle2 size={13} className="chip-check" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
