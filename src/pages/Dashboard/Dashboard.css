@@ -70,8 +70,8 @@
   justify-content: center;
   color: var(--amber);
   background:
-    radial-gradient(circle at 50% 45%, rgba(255, 149, 0, 0.2), rgba(0, 0, 0, 0) 55%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.6));
+    radial-gradient(circle at 50% 45%, rgba(230, 126, 34, 0.15), rgba(0, 0, 0, 0) 55%),
+    linear-gradient(160deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.06));
 }
 
 /* Report Meta Row */

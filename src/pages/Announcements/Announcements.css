@@ -17,7 +17,7 @@
   margin-bottom: var(--space-xl);
   padding: var(--space-xl);
   border: 1px solid var(--border-medium);
-  background: linear-gradient(145deg, rgba(30,30,35,0.6) 0%, rgba(20,20,24,0.8) 100%);
+  background: linear-gradient(145deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
   backdrop-filter: blur(12px);
   border-radius: var(--radius-lg);
 }
@@ -97,7 +97,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  color: #fca5a5;
+  color: var(--signal-red);
   margin-bottom: var(--space-xs);
 }
 
@@ -115,7 +115,7 @@
 .announcements-critical-card > span {
   font-size: 0.7rem;
   font-family: var(--font-mono);
-  color: #fca5a5;
+  color: var(--signal-red);
   letter-spacing: 0.05em;
 }
 
@@ -213,19 +213,19 @@
 }
 
 .announcement-priority-badge.critical {
-  color: #fca5a5;
+  color: var(--signal-red);
   border-color: rgba(248, 113, 113, 0.4);
   background: rgba(239, 68, 68, 0.1);
 }
 
 .announcement-priority-badge.high {
-  color: #fcd34d;
+  color: var(--amber);
   border-color: rgba(251, 191, 36, 0.4);
   background: rgba(245, 158, 11, 0.1);
 }
 
 .announcement-priority-badge.normal {
-  color: #93c5fd;
+  color: var(--signal-blue);
   border-color: rgba(96, 165, 250, 0.4);
   background: rgba(59, 130, 246, 0.1);
 }

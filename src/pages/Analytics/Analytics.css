@@ -17,7 +17,7 @@
   padding: 8px 10px;
   border: 1px solid var(--border-dim);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .analytics-filter-label {
@@ -48,8 +48,8 @@
 }
 
 .analytics-filter-select option {
-  background-color: #0f0f12;
-  color: #fff;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .stats-grid {
@@ -104,11 +104,11 @@
 }
 
 .analytics-district-table tbody tr {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.008) 0%, rgba(255, 255, 255, 0) 100%);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.008) 0%, rgba(0, 0, 0, 0) 100%);
 }
 
 .analytics-district-table tbody tr:nth-child(2n) {
-  background: rgba(255, 255, 255, 0.015);
+  background: rgba(0, 0, 0, 0.015);
 }
 
 .metric-number {
@@ -133,7 +133,7 @@
   width: 7rem;
   height: 0.42rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 

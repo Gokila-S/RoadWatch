@@ -188,15 +188,15 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
-  color-scheme: dark;
+  color-scheme: light;
   transition: border-color var(--transition-fast);
 }
 
 .ann-select:focus { border-color: var(--amber); }
 
 .ann-select option {
-  background-color: #0f0f12;
-  color: #fff;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 /* Category Tags */
@@ -234,7 +234,7 @@
 /* Feedback */
 .ann-error {
   margin: 0;
-  color: #f87171;
+  color: var(--signal-red);
   font-size: 0.78rem;
   display: flex;
   align-items: center;
@@ -247,7 +247,7 @@
 
 .ann-success {
   margin: 0;
-  color: #4ade80;
+  color: var(--signal-green);
   font-size: 0.78rem;
   background: rgba(34, 197, 94, 0.06);
   padding: 8px 12px;
@@ -304,13 +304,13 @@
   justify-content: space-between;
   gap: var(--space-md);
   align-items: flex-start;
-  background: rgba(15, 23, 42, 0.4);
+  background: var(--bg-tertiary);
   transition: all var(--transition-fast);
 }
 
 .ann-list-item:hover {
   border-color: var(--border-medium);
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--bg-surface);
 }
 
 .ann-list-item-content {
@@ -372,7 +372,7 @@
 .ann-delete-btn {
   background: transparent;
   border: 1px solid rgba(248, 113, 113, 0.35);
-  color: #fca5a5;
+  color: var(--signal-red);
   border-radius: var(--radius-md);
   width: 34px;
   height: 34px;

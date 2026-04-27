@@ -143,7 +143,7 @@
 
 .validation-summary-card {
   border-radius: 12px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.02), rgba(0, 0, 0, 0.01));
 }
 
 .validation-summary-head {
@@ -189,7 +189,7 @@
 }
 
 .validation-metric {
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.03);
   border: 1px solid var(--border-dim);
   border-radius: 10px;
   padding: 10px 12px;
@@ -228,8 +228,8 @@
   border: 1px solid var(--border-dim);
   border-radius: 12px;
   padding: 14px;
-  background: linear-gradient(180deg, rgba(8, 15, 38, 0.68), rgba(3, 8, 24, 0.82));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  background: var(--bg-tertiary);
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.03);
 }
 
 .report-announcement-check-head {
@@ -260,7 +260,7 @@
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   padding: 10px;
-  background: rgba(2, 6, 23, 0.55);
+  background: var(--bg-tertiary);
 }
 
 .report-announcement-item-head {
@@ -311,7 +311,7 @@
 
 .report-announcement-item-similar {
   border-color: rgba(14, 165, 233, 0.42);
-  background: linear-gradient(180deg, rgba(7, 20, 44, 0.34), rgba(6, 12, 30, 0.84));
+  background: var(--bg-tertiary);
   padding-bottom: 12px;
 }
 
@@ -338,8 +338,8 @@
 
 .report-support-btn {
   border-color: rgba(56, 189, 248, 0.5);
-  color: #e0f2fe;
-  background: rgba(4, 19, 45, 0.56);
+  color: var(--signal-cyan);
+  background: var(--bg-tertiary);
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -364,7 +364,7 @@
   color: var(--text-tertiary);
   font-family: var(--font-mono);
   border: 1px solid var(--border-subtle);
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(0, 0, 0, 0.02);
   border-radius: 999px;
   padding: 3px 8px;
 }
@@ -500,7 +500,7 @@
 .ai-scanning-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(10,10,12,0.3);
+  background: rgba(0,0,0,0.05);
   backdrop-filter: blur(1px);
   z-index: 10;
 }

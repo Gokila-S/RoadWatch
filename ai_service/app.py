@@ -47,18 +47,22 @@ def load_keras_model():
         logger.error("Model file not found at: %s", MODEL_PATH)
         return False
     try:
-        # Import TensorFlow here so the app can still start even if TF isn't
-        # installed — the /predict route will return a clear error in that case.
-        import tensorflow as tf
-        
-        # Monkey-patch Dense.__init__ to ignore 'quantization_config' when loading older models
-        original_init = tf.keras.layers.Dense.__init__
+        # TF 2.16+ removed tf.keras — use standalone keras or tf_keras
+        try:
+            import keras
+            logger.info("Using standalone keras %s", keras.__version__)
+        except ImportError:
+            import tf_keras as keras
+            logger.info("Using tf_keras (legacy compat)")
+
+        # Monkey-patch Dense.__init__ to ignore 'quantization_config' from older models
+        original_init = keras.layers.Dense.__init__
         def patched_init(self, *args, **kwargs):
             kwargs.pop('quantization_config', None)
             original_init(self, *args, **kwargs)
-        tf.keras.layers.Dense.__init__ = patched_init
+        keras.layers.Dense.__init__ = patched_init
 
-        model = tf.keras.models.load_model(MODEL_PATH)
+        model = keras.models.load_model(MODEL_PATH)
         logger.info("✅ Model loaded successfully from %s", MODEL_PATH)
         return True
     except Exception as exc:

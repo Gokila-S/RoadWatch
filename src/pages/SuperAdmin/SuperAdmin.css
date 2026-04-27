@@ -26,7 +26,7 @@
   border-radius: 10px;
   font-size: 0.85rem;
   font-weight: 500;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.1);
   backdrop-filter: blur(12px);
   white-space: nowrap;
 }
@@ -34,13 +34,13 @@
 .sa-toast-success {
   background: rgba(34, 197, 94, 0.12);
   border: 1px solid rgba(34, 197, 94, 0.4);
-  color: #4ade80;
+  color: var(--signal-green);
 }
 
 .sa-toast-error {
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.4);
-  color: #f87171;
+  color: var(--signal-red);
 }
 
 .sa-toast button {
@@ -90,7 +90,7 @@
   font-size: clamp(1.5rem, 3vw, 2.2rem);
   font-weight: 800;
   font-family: var(--font-display);
-  background: linear-gradient(135deg, #f0f0f2, var(--amber));
+  background: linear-gradient(135deg, var(--text-primary), var(--amber));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -236,7 +236,7 @@
 
 .sa-district-card:hover {
   border-color: var(--border-medium);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
   transform: translateY(-2px);
 }
 
@@ -299,7 +299,7 @@
 }
 
 .sa-dc-metric {
-  background: rgba(0,0,0,0.25);
+  background: rgba(0,0,0,0.03);
   border-radius: 6px;
   padding: 8px;
   text-align: center;
@@ -362,13 +362,13 @@
 }
 
 .sa-status-active {
-  color: #4ade80;
+  color: var(--signal-green);
   background: rgba(34, 197, 94, 0.1);
   border: 1px solid rgba(34, 197, 94, 0.3);
 }
 
 .sa-status-inactive {
-  color: #fb923c;
+  color: var(--signal-orange);
   background: rgba(249, 115, 22, 0.1);
   border: 1px solid rgba(249, 115, 22, 0.3);
 }
@@ -386,7 +386,7 @@
   position: absolute;
   bottom: 16px;
   left: 16px;
-  background: rgba(10, 10, 12, 0.9);
+  background: var(--bg-tertiary);
   backdrop-filter: blur(8px);
   border: 1px solid var(--border-subtle);
   border-radius: 8px;
@@ -464,7 +464,7 @@
 
 .sa-dir-search-clear:hover {
   color: var(--text-primary);
-  background: rgba(255,255,255,0.05);
+  background: rgba(0,0,0,0.03);
 }
 
 /* Admin Cards */
@@ -484,7 +484,7 @@
 
 .sa-admin-card:hover {
   border-color: var(--border-medium);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
 }
 
 .sa-admin-card-header {
@@ -574,7 +574,7 @@
 }
 
 .sa-icon-btn-danger:hover {
-  color: #f87171;
+  color: var(--signal-red);
   border-color: rgba(239, 68, 68, 0.4);
   background: rgba(239, 68, 68, 0.06);
 }
@@ -701,12 +701,12 @@
 .sa-select {
   padding-left: 14px !important;
   cursor: pointer;
-  color-scheme: dark;
+  color-scheme: light;
   appearance: none;
 }
 
 .sa-field-error {
-  color: #f87171;
+  color: var(--signal-red);
   font-size: 0.7rem;
   margin: 0;
 }
@@ -779,7 +779,7 @@
 .sa-modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.3);
   backdrop-filter: blur(8px);
   z-index: 1000;
 }
@@ -803,7 +803,7 @@
   border-radius: 16px;
   padding: 28px;
   pointer-events: auto; /* Re-enable clicks inside modal */
-  box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.04);
 }
 
 .sa-modal-header {
@@ -834,7 +834,7 @@
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  background: rgba(255,255,255,0.04);
+  background: rgba(0,0,0,0.03);
   border: 1px solid var(--border-subtle);
   color: var(--text-tertiary);
   cursor: pointer;
@@ -848,7 +848,7 @@
 .sa-modal-close:hover {
   background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  color: var(--signal-red);
 }
 
 .sa-modal-actions {

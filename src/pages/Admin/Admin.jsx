@@ -167,7 +167,7 @@ const Admin = () => {
               <span className="stat-value" style={{ color: STATUS_COLORS.assigned }}>{assignedCount}</span>
             </div>
             <div className="admin-stat-box alert-box stat-clickable" style={{ borderRight: 'none' }} onClick={() => { setFilterSeverity('critical') }}>
-              <span className="stat-label" style={{ color: '#f87171' }}>Critical</span>
+              <span className="stat-label" style={{ color: 'var(--signal-red)' }}>Critical</span>
               <span className="stat-value">{criticalCount}</span>
             </div>
           </div>
@@ -286,7 +286,7 @@ const Admin = () => {
                        <div style={{ flexShrink: 0, transform: 'scale(0.85)', transformOrigin: 'left center' }}>
                          <AiConfidenceBadge confidence={selectedReport.aiConfidence} />
                        </div>
-                       <p className="detail-ai-summary">Pattern match: <strong style={{ color: '#fff' }}>{selectedReport.category.toUpperCase()}</strong>. Structural degradation severity estimated at {selectedReport.severity.toUpperCase()}.</p>
+                       <p className="detail-ai-summary">Pattern match: <strong style={{ color: 'var(--text-primary)' }}>{selectedReport.category.toUpperCase()}</strong>. Structural degradation severity estimated at {selectedReport.severity.toUpperCase()}.</p>
                      </div>
                    </div>
                    
@@ -343,7 +343,7 @@ const Admin = () => {
                              <option>Water & Sewage Board</option>
                              <option>Highway Maintenance</option>
                            </select>
-                           <select className="assign-select" style={{ color: '#f87171' }}>
+                           <select className="assign-select" style={{ color: 'var(--signal-red)' }}>
                              <option>Priority: Standard</option>
                              <option>Priority: URGENT (24h)</option>
                            </select>

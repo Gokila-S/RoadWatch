@@ -269,9 +269,44 @@ const getPersistedAuth = () => {
 
 const persistedAuth = getPersistedAuth()
 
+const getPersistedTheme = () => {
+  const theme = localStorage.getItem('rw_theme') || 'light'
+  if (theme === 'dark') {
+    document.documentElement.classList.add('dark-theme')
+  } else {
+    document.documentElement.classList.remove('dark-theme')
+  }
+  return theme
+}
+
+const initialTheme = getPersistedTheme()
+
 // ── Store ──
 
 const useStore = create((set, get) => ({
+  // Theme
+  theme: initialTheme,
+  toggleTheme: () => set((state) => {
+    const newTheme = state.theme === 'light' ? 'dark' : 'light'
+    localStorage.setItem('rw_theme', newTheme)
+
+    // Enable smooth transition animation
+    document.documentElement.classList.add('theme-transitioning')
+
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark-theme')
+    } else {
+      document.documentElement.classList.remove('dark-theme')
+    }
+
+    // Remove transition class after animation completes
+    setTimeout(() => {
+      document.documentElement.classList.remove('theme-transitioning')
+    }, 500)
+
+    return { theme: newTheme }
+  }),
+
   // Auth
   user: persistedAuth.user,
   token: persistedAuth.token,

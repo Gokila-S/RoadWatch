@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Sun, Moon } from 'lucide-react'
 import useStore from '../../store/useStore'
 import logoImg from '../../assets/logo.png'
 import './Header.css'
@@ -8,7 +9,7 @@ import './Header.css'
 const Header = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { isAuthenticated, user, userRole, logout } = useStore()
+  const { isAuthenticated, user, userRole, logout, theme, toggleTheme } = useStore()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -102,6 +103,36 @@ const Header = () => {
         </nav>
 
         <div className="header-actions">
+          <button 
+            onClick={toggleTheme} 
+            className="theme-toggle-btn"
+            aria-label="Toggle Theme"
+            style={{
+              background: 'var(--bg-surface)',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: '50%',
+              width: '38px',
+              height: '38px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              transition: 'all var(--transition-fast)',
+              marginRight: '8px'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.color = 'var(--text-primary)'
+              e.currentTarget.style.borderColor = 'var(--border-medium)'
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.color = 'var(--text-secondary)'
+              e.currentTarget.style.borderColor = 'var(--border-subtle)'
+            }}
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
+
           {isAuthenticated && (
             <>
               <div className="profile-wrapper">
@@ -147,7 +178,7 @@ const Header = () => {
                             <div style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)', color: 'var(--signal-cyan)', letterSpacing: '0.1em', marginBottom: '2px' }}>
                               COMMANDER // {user?.district?.toUpperCase() || 'GLOBAL'}
                             </div>
-                            <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: '#fff' }}>{user?.name}</div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 'bold', color: 'var(--text-primary)' }}>{user?.name}</div>
                           </div>
                         </div>
                       ) : (
