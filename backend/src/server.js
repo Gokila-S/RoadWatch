@@ -42,7 +42,7 @@ const bootstrapDatabase = async () => {
   }
 }
 
-const allowedOrigins = env.frontendOrigin.split(',').map((o) => o.trim()).filter(Boolean)
+const allowedOrigins = env.frontendOrigin.split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean)
 app.use(cors({ origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins, credentials: true }))
 app.use(express.json({ limit: '2mb' }))
 

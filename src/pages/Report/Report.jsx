@@ -55,8 +55,9 @@ const Report = () => {
   const analyzeRoadLikelihood = async (file) => {
     const formData = new FormData();
     formData.append("image", file);
+    const AI_URL = import.meta.env.VITE_AI_SERVICE_URL || 'http://127.0.0.1:5000'
     try {
-      const response = await fetch("http://127.0.0.1:5000/predict", {
+      const response = await fetch(`${AI_URL}/predict`, {
         method: "POST",
         body: formData,
       });
