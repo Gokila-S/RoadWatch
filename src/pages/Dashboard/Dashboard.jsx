@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { AlertTriangle, CloudRain, Construction, ImageOff, MapPin } from 'lucide-react'
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
+import Loader from '../../components/Loader/Loader'
 import { StatusBadge, SeverityBadge } from '../../components/StatusBadge/StatusBadge'
 import { getReportImage, FALLBACK_IMAGES } from '../../utils/imageFallback'
 import './Dashboard.css'
@@ -50,6 +51,7 @@ const Dashboard = () => {
   const { user, reports, fetchReports } = useStore()
   const [userLocation, setUserLocation] = useState(null)
   const [locationError, setLocationError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     const query = userLocation
@@ -61,9 +63,12 @@ const Dashboard = () => {
       }
       : {}
 
-    fetchReports(query).catch((error) => {
-      console.error('Failed to fetch dashboard reports', error)
-    })
+    setLoading(true)
+    fetchReports(query)
+      .catch((error) => {
+        console.error('Failed to fetch dashboard reports', error)
+      })
+      .finally(() => setLoading(false))
   }, [fetchReports, userLocation])
 
   useEffect(() => {
@@ -159,7 +164,11 @@ const Dashboard = () => {
               <span className="badge" style={{background: 'var(--bg-tertiary)'}}>{activeReports.length}</span>
             </h2>
             
-            {activeReports.length > 0 ? (
+            {loading ? (
+              <div style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                <Loader />
+              </div>
+            ) : activeReports.length > 0 ? (
               <div className="reports-list space-y-sm">
                 {activeReports.map((report, i) => (
                   <motion.div 
@@ -338,10 +347,12 @@ const Dashboard = () => {
               </div>
 
               <div className="mt-4 pt-3 border-t border-dim flex items-center gap-2 text-xs font-mono text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="var(--text-primary)" stroke="#000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-                  <circle cx="12" cy="10" r="3" fill="#000"/>
-                </svg>
+                <div style={{ position: 'relative', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="var(--signal-blue)" stroke="var(--bg-secondary)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                    <circle cx="12" cy="10" r="3" fill="var(--bg-secondary)"/>
+                  </svg>
+                </div>
                 <span>You are here</span>
               </div>
             </div>

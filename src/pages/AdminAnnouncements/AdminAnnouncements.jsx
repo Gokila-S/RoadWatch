@@ -8,9 +8,9 @@ const REPORT_CATEGORIES = ['pothole', 'crack', 'hazard', 'waterlogging', 'erosio
 const SUPPORTED_DISTRICTS = ['Coimbatore', 'Erode', 'Tiruppur', 'Salem', 'Trichy']
 
 const PRIORITY_CONFIG = {
-  critical: { label: 'Critical', color: '#f87171', bg: 'rgba(239, 68, 68, 0.12)', border: 'rgba(239, 68, 68, 0.35)' },
-  high:     { label: 'High',     color: '#fbbf24', bg: 'rgba(245, 158, 11, 0.12)', border: 'rgba(245, 158, 11, 0.35)' },
-  normal:   { label: 'Normal',   color: '#60a5fa', bg: 'rgba(59, 130, 246, 0.12)', border: 'rgba(59, 130, 246, 0.35)' },
+  critical: { label: 'Critical', color: 'var(--signal-red)', bg: 'var(--bg-tertiary)', border: 'var(--border-accent)' },
+  high:     { label: 'High',     color: 'var(--amber)',      bg: 'var(--bg-tertiary)', border: 'var(--border-accent)' },
+  normal:   { label: 'Normal',   color: 'var(--signal-blue)', bg: 'var(--bg-tertiary)', border: 'var(--border-subtle)' },
 }
 
 

@@ -491,7 +491,7 @@ const Report = () => {
                     {cameraReady ? 'TAP TO CAPTURE PHOTO' : 'OPEN CAMERA OR UPLOAD'}
                   </p>
                   {cameraError ? <p className="camera-warning">{cameraError}</p> : null}
-                  {submitError ? <p className="text-sm mt-4 text-center font-semibold" style={{ color: '#ff6b6b', textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>{submitError}</p> : null}
+                  {submitError ? <p className="text-sm mt-4 text-center font-semibold" style={{ color: 'var(--signal-red)', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>{submitError}</p> : null}
                   {roadScanChecking ? <p className="text-sm mt-4 text-center font-semibold text-signal-cyan" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>Analyzing image via AI...</p> : null}
 
                   <div className="camera-actions mt-4">
@@ -780,7 +780,7 @@ const Report = () => {
                         ? 'Use Support Existing Issue'
                         : 'Deploy Report Protocol'} <ChevronRight size={18} />
                  </button>
-                    {submitError ? <p className="text-dim mb-8" style={{ color: '#ff6b6b' }}>{submitError}</p> : null}
+                    {submitError ? <p className="text-dim mb-8" style={{ color: 'var(--signal-red)' }}>{submitError}</p> : null}
                </div>
              </div>
           </motion.div>

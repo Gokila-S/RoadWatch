@@ -47,20 +47,10 @@ def load_keras_model():
         logger.error("Model file not found at: %s", MODEL_PATH)
         return False
     try:
-        # TF 2.16+ removed tf.keras — use standalone keras or tf_keras
-        try:
-            import keras
-            logger.info("Using standalone keras %s", keras.__version__)
-        except ImportError:
-            import tf_keras as keras
-            logger.info("Using tf_keras (legacy compat)")
-
-        # Monkey-patch Dense.__init__ to ignore 'quantization_config' from older models
-        original_init = keras.layers.Dense.__init__
-        def patched_init(self, *args, **kwargs):
-            kwargs.pop('quantization_config', None)
-            original_init(self, *args, **kwargs)
-        keras.layers.Dense.__init__ = patched_init
+        # Use Keras 3 (standalone)
+        import keras
+        import tensorflow as tf
+        logger.info("Using Keras %s with TensorFlow backend %s", keras.__version__, tf.__version__)
 
         model = keras.models.load_model(MODEL_PATH)
         logger.info("✅ Model loaded successfully from %s", MODEL_PATH)

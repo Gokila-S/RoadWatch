@@ -30,9 +30,9 @@
 
 /* Pending — Amber/Orange */
 .badge-pending {
-  color: #fbbf24;
-  background: rgba(245, 158, 11, 0.12);
-  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--amber);
+  background: var(--bg-tertiary);
+  border-color: var(--amber);
 }
 .badge-pending .badge-dot {
   background-color: #f59e0b;
@@ -42,9 +42,9 @@
 
 /* Verified — Blue */
 .badge-verified {
-  color: #60a5fa;
-  background: rgba(59, 130, 246, 0.12);
-  border-color: rgba(59, 130, 246, 0.3);
+  color: var(--signal-blue);
+  background: var(--bg-tertiary);
+  border-color: var(--signal-blue);
 }
 .badge-verified .badge-dot {
   background-color: #3b82f6;
@@ -53,9 +53,9 @@
 
 /* Assigned — Purple */
 .badge-assigned {
-  color: #c084fc;
-  background: rgba(168, 85, 247, 0.12);
-  border-color: rgba(168, 85, 247, 0.3);
+  color: var(--signal-purple);
+  background: var(--bg-tertiary);
+  border-color: var(--signal-purple);
 }
 .badge-assigned .badge-dot {
   background-color: #a855f7;
@@ -64,9 +64,9 @@
 
 /* Resolved — Green */
 .badge-resolved {
-  color: #4ade80;
-  background: rgba(34, 197, 94, 0.12);
-  border-color: rgba(34, 197, 94, 0.3);
+  color: var(--signal-green);
+  background: var(--bg-tertiary);
+  border-color: var(--signal-green);
 }
 .badge-resolved .badge-dot {
   background-color: #22c55e;
@@ -77,9 +77,9 @@
 
 /* Critical — Red */
 .badge-critical {
-  color: #f87171;
-  background: rgba(239, 68, 68, 0.14);
-  border-color: rgba(239, 68, 68, 0.35);
+  color: var(--signal-red);
+  background: var(--bg-tertiary);
+  border-color: var(--signal-red);
   animation: pulse-red-glow 2.5s infinite;
 }
 

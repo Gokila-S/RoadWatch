@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
+import Loader from '../../components/Loader/Loader'
 import { StatusBadge, SeverityBadge, AiConfidenceBadge } from '../../components/StatusBadge/StatusBadge'
 import { getReportImage, FALLBACK_IMAGES } from '../../utils/imageFallback'
 import './Admin.css'
@@ -20,10 +21,10 @@ const CATEGORY_CONFIG = {
 }
 
 const STATUS_COLORS = {
-  pending: '#f59e0b',
-  verified: '#3b82f6',
-  assigned: '#a855f7',
-  resolved: '#22c55e',
+  pending: 'var(--amber)',
+  verified: 'var(--signal-blue)',
+  assigned: 'var(--signal-purple)',
+  resolved: 'var(--signal-green)',
 }
 
 const DISTRICT_BOUNDARIES = {
@@ -71,6 +72,7 @@ const Admin = () => {
   
   const [selectedReport, setSelectedReport] = useState(null)
   const [assigningId, setAssigningId] = useState(null)
+  const [loading, setLoading] = useState(false)
   const [searchParams, setSearchParams] = useSearchParams()
 
   // Read URL search params on mount
@@ -90,9 +92,12 @@ const Admin = () => {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    fetchReports().catch((error) => {
-      console.error('Failed to fetch reports for admin', error)
-    })
+    setLoading(true)
+    fetchReports()
+      .catch((error) => {
+        console.error('Failed to fetch reports for admin', error)
+      })
+      .finally(() => setLoading(false))
   }, [fetchReports])
 
   // District admins see their district, super admins see all
@@ -201,7 +206,11 @@ const Admin = () => {
 
                {/* Reports List */}
                <div className="report-list-scroll">
-                 {filteredReports.map(report => {
+                 {loading ? (
+                   <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                     <Loader />
+                   </div>
+                 ) : filteredReports.map(report => {
                    const sla = getSLAStatus(report.slaDeadline)
                    return (
                      <div 

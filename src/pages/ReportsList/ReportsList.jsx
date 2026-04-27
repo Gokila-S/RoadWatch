@@ -8,6 +8,7 @@ import {
   Construction, ScanSearch, Tag, Clock, ChevronDown, RotateCcw
 } from 'lucide-react'
 import useStore from '../../store/useStore'
+import Loader from '../../components/Loader/Loader'
 import { StatusBadge, SeverityBadge, AiConfidenceBadge } from '../../components/StatusBadge/StatusBadge'
 import { getReportImage, FALLBACK_IMAGES } from '../../utils/imageFallback'
 import './ReportsList.css'
@@ -69,9 +70,12 @@ const ReportsList = () => {
     if (district) query.district = district
     if (category) query.category = category
 
-    fetchReports(query).catch((error) => {
-      console.error('Failed to fetch reports list', error)
-    })
+    setLoading(true)
+    fetchReports(query)
+      .catch((error) => {
+        console.error('Failed to fetch reports list', error)
+      })
+      .finally(() => setLoading(false))
 
     if (status) setStatusFilter(status)
     if (severity) setSeverityFilter(severity)
@@ -98,6 +102,7 @@ const ReportsList = () => {
   const [showMobileFilters, setShowMobileFilters] = useState(false)
   const [showSortDropdown, setShowSortDropdown] = useState(false)
   const [collapsedSections, setCollapsedSections] = useState({})
+  const [loading, setLoading] = useState(false)
   
   const toggleSection = (key) => setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }))
   
@@ -618,7 +623,11 @@ const ReportsList = () => {
             <span>{filteredAndSortedReports.length} report{filteredAndSortedReports.length !== 1 ? 's' : ''} found</span>
           </div>
 
-          {filteredAndSortedReports.length === 0 ? (
+          {loading ? (
+             <div style={{ minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+               <Loader />
+             </div>
+          ) : filteredAndSortedReports.length === 0 ? (
              <div className="empty-state-ui">
                <div className="empty-icon-wrap">
                  <CheckCircle2 size={48} color="#22c55e" />

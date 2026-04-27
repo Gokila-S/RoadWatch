@@ -105,11 +105,7 @@ const Analytics = () => {
            <h3 className="heading-display text-accent text-3xl">{analyticsSummary?.avg_ai_confidence || 0}%</h3>
            <p className="text-signal-green text-xs mt-2">Live from backend</p>
         </motion.div>
-        <motion.div className="stat-card glass-panel" initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{delay: 0.2}}>
-           <p className="text-mono text-dim mb-2 text-xs">AVG SLA RESOLUTION TIME</p>
-            <h3 className="heading-display text-3xl">{districtRows.length} <span className="text-lg text-dim">Districts</span></h3>
-           <p className="text-signal-green text-xs mt-2">Live district coverage</p>
-        </motion.div>
+
         <motion.div className="stat-card glass-panel" initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}} transition={{delay: 0.3}}>
            <p className="text-mono text-dim mb-2 text-xs">AUTO-ROUTING EFFICIENCY</p>
            <h3 className="heading-display text-3xl">{analyticsSummary?.resolved || 0}/{analyticsSummary?.total || 0}</h3>
@@ -189,7 +185,6 @@ const Analytics = () => {
                 <th className="p-md font-normal text-right">TOTAL ISSUES</th>
                 <th className="p-md font-normal text-right">RESOLVED (%)</th>
                 <th className="p-md font-normal text-right">PENDING</th>
-                <th className="p-md font-normal text-right">AVG SLA</th>
               </tr>
             </thead>
             <tbody>
@@ -215,13 +210,12 @@ const Analytics = () => {
                       </div>
                     </td>
                     <td className="p-md text-right text-sm metric-number">{district.pending.toLocaleString('en-IN')}</td>
-                    <td className="p-md text-right text-sm text-mono text-secondary">{district.avgResolution}</td>
                   </tr>
                 )
               })}
               {districtRows.length === 0 ? (
                 <tr>
-                  <td className="p-md text-center text-dim" colSpan={6}>
+                  <td className="p-md text-center text-dim" colSpan={5}>
                     No district analytics available.
                   </td>
                 </tr>

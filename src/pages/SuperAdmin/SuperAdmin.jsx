@@ -8,6 +8,7 @@ import {
   EyeOff, Lock, Phone, Mail, Building2, UserPlus, AlertCircle
 } from 'lucide-react'
 import useStore from '../../store/useStore'
+import Loader from '../../components/Loader/Loader'
 import './SuperAdmin.css'
 
 // Tamil Nadu district coordinates for the map
@@ -59,6 +60,7 @@ const SuperAdmin = () => {
   const [form, setForm] = useState(initialForm)
   const [formErrors, setFormErrors] = useState({})
   const [loading, setLoading] = useState(false)
+  const [dataLoading, setDataLoading] = useState(false)
   const [msg, setMsg] = useState(null) // { type: 'success'|'error', text }
   const [editTarget, setEditTarget] = useState(null)
   const [editForm, setEditForm] = useState({})
@@ -71,7 +73,10 @@ const SuperAdmin = () => {
   const [mapReady, setMapReady] = useState(false)
 
   useEffect(() => {
-    fetchDistrictAdmins().catch(err => setMsg({ type: 'error', text: err.message }))
+    setDataLoading(true)
+    fetchDistrictAdmins()
+      .catch(err => setMsg({ type: 'error', text: err.message }))
+      .finally(() => setDataLoading(false))
     setTimeout(() => setMapReady(true), 100)
   }, [fetchDistrictAdmins])
 
@@ -212,42 +217,42 @@ const SuperAdmin = () => {
       <div className="sa-page-header">
         <div className="sa-header-left">
           <div className="sa-header-badge">
-            <Globe size={12} /> NATIONAL COMMAND
+            NATIONAL COMMAND
           </div>
           <h1 className="sa-headline">Super Admin Console</h1>
           <p className="sa-sub">Centralized governance for all district operations and administrator lifecycle management.</p>
         </div>
         <div className="sa-header-kpi-strip">
           <div className="sa-kpi-box">
-            <Users size={18} className="sa-kpi-icon" style={{ color: '#a855f7' }} />
+            <Users size={18} className="sa-kpi-icon" style={{ color: 'var(--signal-purple)' }} />
             <div>
               <p className="sa-kpi-label">District Admins</p>
               <p className="sa-kpi-value">{districtAdmins.length}</p>
             </div>
           </div>
           <div className="sa-kpi-box">
-            <MapPin size={18} className="sa-kpi-icon" style={{ color: '#06b6d4' }} />
+            <MapPin size={18} className="sa-kpi-icon" style={{ color: 'var(--signal-cyan)' }} />
             <div>
               <p className="sa-kpi-label">Districts</p>
               <p className="sa-kpi-value">{districtCount}</p>
             </div>
           </div>
           <div className="sa-kpi-box">
-            <UserCheck size={18} className="sa-kpi-icon" style={{ color: '#22c55e' }} />
+            <UserCheck size={18} className="sa-kpi-icon" style={{ color: 'var(--signal-green)' }} />
             <div>
               <p className="sa-kpi-label">Active Accounts</p>
               <p className="sa-kpi-value">{activeCount}</p>
             </div>
           </div>
           <div className="sa-kpi-box">
-            <AlertTriangle size={18} className="sa-kpi-icon" style={{ color: '#ef4444' }} />
+            <AlertTriangle size={18} className="sa-kpi-icon" style={{ color: 'var(--signal-red)' }} />
             <div>
               <p className="sa-kpi-label">Critical Active</p>
               <p className="sa-kpi-value">{criticalActive}</p>
             </div>
           </div>
           <div className="sa-kpi-box">
-            <BarChart3 size={18} className="sa-kpi-icon" style={{ color: '#f59e0b' }} />
+            <BarChart3 size={18} className="sa-kpi-icon" style={{ color: 'var(--amber)' }} />
             <div>
               <p className="sa-kpi-label">Total Reports</p>
               <p className="sa-kpi-value">{totalReports}</p>
@@ -276,7 +281,11 @@ const SuperAdmin = () => {
           <div className="sa-section">
             <h2 className="sa-section-title"><Activity size={16} /> District Performance</h2>
             <div className="sa-district-grid">
-              {districtPerformance.map(admin => (
+              {dataLoading ? (
+                <div style={{ gridColumn: '1 / -1', minHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Loader />
+                </div>
+              ) : districtPerformance.map(admin => (
                 <motion.div
                   key={admin.id}
                   className={`sa-district-card ${selectedDistrict?.id === admin.id ? 'sa-district-card-selected' : ''}`}
@@ -285,7 +294,9 @@ const SuperAdmin = () => {
                   animate={{ opacity: 1, y: 0 }}
                 >
                   <div className="sa-dc-header">
-                    <div className="sa-dc-avatar">{admin.full_name?.charAt(0)}</div>
+                    <div className="sa-dc-icon-wrap">
+                      <Building2 size={20} className="sa-dc-icon" />
+                    </div>
                     <div className="sa-dc-info">
                       <p className="sa-dc-district">{admin.district}</p>
                       <p className="sa-dc-admin">{admin.full_name}</p>
@@ -344,8 +355,8 @@ const SuperAdmin = () => {
                   scrollWheelZoom={false}
                 >
                   <TileLayer
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    attribution="&copy; OpenStreetMap contributors"
+                    url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                    attribution="&copy; Google Maps"
                   />
                   {districtAdmins.map(admin => {
                     const key = admin.district?.toLowerCase().trim()
@@ -353,7 +364,7 @@ const SuperAdmin = () => {
                     if (!coords) return null
                     const distReports = reports?.filter(r => r.district === admin.district) || []
                     const critical = distReports.filter(r => r.severity === 'critical' && r.status !== 'resolved').length
-                    const color = critical > 0 ? '#ef4444' : admin.status === 'active' ? '#22c55e' : '#6b7280'
+                    const color = critical > 0 ? 'var(--signal-red)' : admin.status === 'active' ? 'var(--signal-green)' : 'var(--text-tertiary)'
                     return (
                       <CircleMarker
                         key={admin.id}
@@ -388,9 +399,9 @@ const SuperAdmin = () => {
                 </MapContainer>
               )}
               <div className="sa-map-legend">
-                <span className="sa-legend-item"><span className="sa-legend-dot" style={{ background: '#ef4444' }}></span>Critical alerts</span>
-                <span className="sa-legend-item"><span className="sa-legend-dot" style={{ background: '#22c55e' }}></span>Active admin</span>
-                <span className="sa-legend-item"><span className="sa-legend-dot" style={{ background: '#6b7280' }}></span>Inactive</span>
+                <span className="sa-legend-item"><span className="sa-legend-dot" style={{ background: 'var(--signal-red)' }}></span>Critical alerts</span>
+                <span className="sa-legend-item"><span className="sa-legend-dot" style={{ background: 'var(--signal-green)' }}></span>Active admin</span>
+                <span className="sa-legend-item"><span className="sa-legend-dot" style={{ background: 'var(--text-tertiary)' }}></span>Inactive</span>
               </div>
             </div>
           </div>
@@ -418,7 +429,11 @@ const SuperAdmin = () => {
               </div>
             </div>
 
-            {filteredAdmins.length === 0 ? (
+            {dataLoading ? (
+              <div style={{ minHeight: '400px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Loader />
+              </div>
+            ) : filteredAdmins.length === 0 ? (
               <div className="sa-empty-state">
                 <Users size={36} style={{ color: 'var(--text-tertiary)' }} />
                 <p>{search ? 'No admins match your search.' : 'No district admins registered.'}</p>
@@ -440,7 +455,9 @@ const SuperAdmin = () => {
                       layout
                     >
                       <div className="sa-admin-card-header">
-                        <div className="sa-admin-avatar">{admin.full_name?.charAt(0)}</div>
+                        <div className="sa-admin-avatar-premium">
+                          <Shield size={20} />
+                        </div>
                         <div className="sa-admin-info">
                           <h3 className="sa-admin-name">{admin.full_name}</h3>
                           <p className="sa-admin-email"><Mail size={11} /> {admin.email}</p>

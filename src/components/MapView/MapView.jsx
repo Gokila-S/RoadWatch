@@ -34,11 +34,11 @@ const userIcon = L.divIcon({
   className: 'custom-marker user-marker',
   html: `
     <div style="position: relative; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transform: translateY(-20px);">
-      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="#2563eb" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 3px 6px rgba(37,99,235,0.5));">
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="var(--signal-blue)" stroke="var(--bg-secondary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 3px 6px var(--amber-glow));">
         <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-        <circle cx="12" cy="10" r="3" fill="#ffffff"/>
+        <circle cx="12" cy="10" r="3" fill="var(--bg-secondary)"/>
       </svg>
-      <div class="marker-pulse" style="width: 40px; height: 40px; background: #2563eb; animation-duration: 2.5s; opacity: 0.2; position: absolute; z-index: -1; transform: translateY(16px);"></div>
+      <div class="marker-pulse" style="width: 40px; height: 40px; background: var(--signal-blue); animation-duration: 2.5s; opacity: 0.2; position: absolute; z-index: -1; transform: translateY(16px);"></div>
     </div>
   `,
   iconSize: [40, 40],
