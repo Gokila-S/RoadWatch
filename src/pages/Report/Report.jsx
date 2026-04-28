@@ -55,7 +55,8 @@ const Report = () => {
   const analyzeRoadLikelihood = async (file) => {
     const formData = new FormData();
     formData.append("image", file);
-    const AI_URL = import.meta.env.VITE_AI_SERVICE_URL || 'http://127.0.0.1:5000'
+    const rawAiUrl = import.meta.env.VITE_AI_SERVICE_URL || 'http://127.0.0.1:5000'
+    const AI_URL = rawAiUrl.replace(/\/$/, '')
     try {
       const response = await fetch(`${AI_URL}/predict`, {
         method: "POST",
@@ -653,7 +654,7 @@ const Report = () => {
                      </div>
                      <input
                        type="text"
-                       className="w-full bg-primary border border-dim rounded-lg p-3 font-body text-sm outline-none focus:border-amber transition-colors text-white focus:ring-1 focus:ring-amber/50"
+                       className="w-full bg-primary border border-dim rounded-lg p-3 font-body text-sm outline-none focus:border-amber transition-colors text-primary focus:ring-1 focus:ring-amber/50"
                        placeholder="Example: Large pothole near bus stop"
                        value={formData.title}
                        onChange={e => setFormData({ ...formData, title: e.target.value })}
@@ -717,7 +718,7 @@ const Report = () => {
                    <div className="mb-2">
                      <label className="text-xs font-mono text-dim mb-2 block tracking-wide">ADDITIONAL INTELLIGENCE (OPTIONAL)</label>
                      <textarea
-                       className="w-full bg-primary border border-dim rounded-lg p-3 font-body text-sm outline-none focus:border-amber transition-colors resize-none text-white focus:ring-1 focus:ring-amber/50"
+                       className="w-full bg-primary border border-dim rounded-lg p-3 font-body text-sm outline-none focus:border-amber transition-colors resize-none text-primary focus:ring-1 focus:ring-amber/50"
                        placeholder="Specify landmarks, scope of damage, or immediate risks..."
                        rows={3}
                        value={formData.description}

@@ -112,7 +112,7 @@ def interpret_prediction(raw_output: float):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return jsonify({"status": "online", "service": "RoadWatch AI Filter API"}), 200
 
 
 @app.route("/predict", methods=["POST"])
