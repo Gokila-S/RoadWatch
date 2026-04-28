@@ -47,9 +47,18 @@ def load_keras_model():
         logger.error("Model file not found at: %s", MODEL_PATH)
         return False
     try:
+        # Force single-threaded CPU execution to prevent OOM on Render Free Tier
+        os.environ["OMP_NUM_THREADS"] = "1"
+        os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
+        os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+
         # Use Keras 3 (standalone)
         import keras
         import tensorflow as tf
+        
+        tf.config.threading.set_intra_op_parallelism_threads(1)
+        tf.config.threading.set_inter_op_parallelism_threads(1)
+        
         logger.info("Using Keras %s with TensorFlow backend %s", keras.__version__, tf.__version__)
 
         # ── Patch for quantization_config compatibility ──────────────────────────
