@@ -17,11 +17,13 @@ const Report = () => {
   const [imageFile, setImageFile] = useState(null)
   const [roadScanChecking, setRoadScanChecking] = useState(false)
   const [roadImageScore, setRoadImageScore] = useState(null)
-  const [analyzing, setAnalyzing] = useState(false)
   const [aiData, setAiData] = useState(null)
   const [createdReportId, setCreatedReportId] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [isSubmittingReport, setIsSubmittingReport] = useState(false)
+  const [isOfflineMode, setIsOfflineMode] = useState(false)
+  const [offlineImageBase64, setOfflineImageBase64] = useState(null)
+  const [preUploadedMediaId, setPreUploadedMediaId] = useState(null)
   const [isSupportingIssue, setIsSupportingIssue] = useState(false)
   const [locationLoading, setLocationLoading] = useState(false)
   const [locationError, setLocationError] = useState('')
@@ -52,32 +54,12 @@ const Report = () => {
   const roadValidationPassed = Number.isFinite(roadImageScore) && roadImageScore >= 45
   const shouldDisableDeploy = isSupportingIssue || similarReports.length > 0
 
-  const analyzeRoadLikelihood = async (file) => {
-    const formData = new FormData();
-    formData.append("image", file);
-    const rawAiUrl = import.meta.env.VITE_AI_SERVICE_URL || 'http://127.0.0.1:5000'
-    const AI_URL = rawAiUrl.replace(/\/$/, '')
-    try {
-      const response = await fetch(`${AI_URL}/predict`, {
-        method: "POST",
-        body: formData,
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return { score: 0, rejected: true, raw: null, isError: true, errorMessage: errorData.error || `Server Error ${response.status}` };
-      }
-      const data = await response.json();
-      return { 
-        score: Math.round(data.confidence * 100), 
-        rejected: !data.store_in_db,
-        raw: data,
-        isError: false
-      };
-    } catch (err) {
-      console.error("AI Service Error:", err);
-      return { score: 0, rejected: true, raw: null, isError: true, errorMessage: err.message };
-    }
-  }
+  const fileToBase64 = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = error => reject(error);
+  });
 
   const stopCameraStream = () => {
     if (cameraStreamRef.current) {
@@ -196,41 +178,50 @@ const Report = () => {
   const processSelectedImage = async (file) => {
     setSubmitError('')
     setRoadScanChecking(true)
+    setIsOfflineMode(false)
+    setPreUploadedMediaId(null)
+    setOfflineImageBase64(null)
 
     try {
-      const aiResult = await analyzeRoadLikelihood(file)
-      if (aiResult.isError) {
-        setSubmitError(`AI Service Error: ${aiResult.errorMessage}. Please ensure the Python backend is running properly.`);
-        setRoadScanChecking(false);
-        return false;
-      }
-      if (aiResult.rejected) {
-        setRoadImageScore(aiResult.score)
-        setAiData(null)
-        setFormData((prev) => ({ ...prev, category: '', severity: '' }))
-        setSubmitError(`AI Rejected: Image does not appear to show road damage (Confidence: ${aiResult.score}%). Please upload a valid image.`)
-        return false
-      }
-
       if (image) {
         URL.revokeObjectURL(image)
       }
-
       const previewUrl = URL.createObjectURL(file)
-      setRoadImageScore(aiResult.score)
       setImage(previewUrl)
       setImageFile(file)
+
+      // Only backend does the AI check now during upload
+      const uploadResult = await uploadReportMedia(file)
+      
+      const score = Math.round(uploadResult.ai.confidence * 100)
+      setRoadImageScore(score)
       setAiData({
-        category: aiResult.raw.prediction,
-        confidence: aiResult.score,
+        category: uploadResult.ai.prediction,
+        confidence: score,
         rejected: false,
         summary: 'Road damage confidently verified by AI model.',
       })
+      setPreUploadedMediaId(uploadResult.media.id)
       setStep(2)
       return true
-    } catch {
-      setSubmitError('Could not process selected image')
-      return false
+    } catch (err) {
+      if (err.code === 'AI_REJECTED') {
+        const score = err.ai ? Math.round(err.ai.confidence * 100) : 0
+        setRoadImageScore(score)
+        setAiData(null)
+        setFormData((prev) => ({ ...prev, category: '', severity: '' }))
+        setSubmitError(`AI Rejected: ${err.message}`)
+        return false
+      } else {
+        // Network or server error - Offline Fallback
+        const base64 = await fileToBase64(file).catch(() => null)
+        setIsOfflineMode(true)
+        setOfflineImageBase64(base64)
+        setRoadImageScore(100) // Bypass
+        setAiData({ category: 'unknown', confidence: 100, rejected: false, summary: 'Offline mode: Manual verification required.' })
+        setStep(2)
+        return true
+      }
     } finally {
       setRoadScanChecking(false)
     }
@@ -321,28 +312,7 @@ const Report = () => {
 
     setSubmitError('')
     setFormData(prev => ({ ...prev, category: cat }))
-    setAiData(null)
   }
-
-  useEffect(() => {
-    if (step !== 2 || !imageFile || !formData.category) {
-      setAnalyzing(false)
-      return
-    }
-
-    if (!AI_SCAN_SUPPORTED_CATEGORIES.includes(formData.category)) {
-      setAnalyzing(false)
-      return
-    }
-
-    setAnalyzing(true)
-
-    const timer = setTimeout(() => {
-      setAnalyzing(false)
-    }, 600)
-
-    return () => clearTimeout(timer)
-  }, [step, imageFile, formData.category])
 
   useEffect(() => {
     if (!formData.category || !locationReady || step !== 2) {
@@ -395,7 +365,7 @@ const Report = () => {
       return
     }
 
-    if (!imageFile) {
+    if (!imageFile && !isOfflineMode) {
       setSubmitError('Please capture or upload a photo before submitting.')
       return
     }
@@ -403,10 +373,32 @@ const Report = () => {
     setIsSubmittingReport(true)
 
     try {
-      const uploadResult = await uploadReportMedia(imageFile)
-      const uploadedImageUrl = uploadResult?.media?.url
-      const uploadedMediaId = uploadResult?.media?.id
-      const uploadAiConfidence = uploadResult?.ai?.confidence
+      if (isOfflineMode && !navigator.onLine) {
+        const { saveOfflineReport } = useStore.getState()
+        const offlineId = `OFFLINE-${Date.now()}`
+        saveOfflineReport({
+          offlineId,
+          imageBase64: offlineImageBase64,
+          mediaIds: [],
+          payload: {
+            title: formData.title.trim(),
+            description: formData.description || 'Citizen submitted report (Offline)',
+            category: formData.category,
+            severity: formData.severity,
+            location,
+            aiConfidence: 100, // Dummy for offline
+          }
+        })
+        setCreatedReportId(offlineId)
+        setStep(3)
+        return
+      }
+
+      let mediaId = preUploadedMediaId
+      if (!mediaId && imageFile) {
+        const uploadResult = await uploadReportMedia(imageFile)
+        mediaId = uploadResult?.media?.id
+      }
 
       const response = await createReport({
         title: formData.title.trim(),
@@ -414,9 +406,8 @@ const Report = () => {
         category: formData.category,
         severity: formData.severity,
         location,
-        mediaIds: uploadedMediaId ? [uploadedMediaId] : [],
-        images: uploadedImageUrl ? [uploadedImageUrl] : [],
-        aiConfidence: Number.isFinite(uploadAiConfidence) ? Math.round(uploadAiConfidence * 100) : undefined,
+        mediaIds: mediaId ? [mediaId] : [],
+        images: [],
       })
 
       const report = response.report
@@ -427,7 +418,24 @@ const Report = () => {
       setCreatedReportId(report.id)
       setStep(3)
     } catch (error) {
-      setSubmitError(error.message || 'Failed to submit report')
+      // If upload/submit fails now, we can fallback to offline storage
+      const { saveOfflineReport } = useStore.getState()
+      const offlineId = `OFFLINE-${Date.now()}`
+      saveOfflineReport({
+        offlineId,
+        imageBase64: offlineImageBase64,
+        mediaIds: preUploadedMediaId ? [preUploadedMediaId] : [],
+        payload: {
+          title: formData.title.trim(),
+          description: formData.description || 'Citizen submitted report (Offline retry)',
+          category: formData.category,
+          severity: formData.severity,
+          location,
+          aiConfidence: 100,
+        }
+      })
+      setCreatedReportId(offlineId)
+      setStep(3)
     } finally {
       setIsSubmittingReport(false)
     }
@@ -493,7 +501,33 @@ const Report = () => {
                     {cameraReady ? 'TAP TO CAPTURE PHOTO' : 'OPEN CAMERA OR UPLOAD'}
                   </p>
                   {cameraError ? <p className="camera-warning">{cameraError}</p> : null}
-                  {submitError ? <p className="text-sm mt-4 text-center font-semibold" style={{ color: 'var(--signal-red)', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>{submitError}</p> : null}
+                  {submitError ? (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }} 
+                      animate={{ opacity: 1, y: 0, scale: 1 }} 
+                      className="mt-6 p-4 rounded-xl flex items-start gap-3 text-left w-full mx-auto"
+                      style={{ 
+                        border: '1px solid rgba(255, 75, 75, 0.3)', 
+                        backgroundColor: 'rgba(255, 75, 75, 0.15)', 
+                        backdropFilter: 'blur(12px)',
+                        boxShadow: '0 8px 32px rgba(255, 75, 75, 0.2)' 
+                      }}
+                    >
+                      <AlertTriangle color="var(--signal-red)" className="shrink-0 mt-0.5" size={20} />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium leading-snug" style={{ color: '#ffb3b3' }}>
+                          {submitError.startsWith('AI Rejected:') ? (
+                            <>
+                              <span style={{ color: 'var(--signal-red)', display: 'block', marginBottom: '4px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.75rem' }}>AI Validation Failed</span>
+                              {submitError.replace('AI Rejected:', '').trim()}
+                            </>
+                          ) : (
+                            submitError
+                          )}
+                        </p>
+                      </div>
+                    </motion.div>
+                  ) : null}
                   {roadScanChecking ? <p className="text-sm mt-4 text-center font-semibold text-signal-cyan" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>Analyzing image via AI...</p> : null}
 
                   <div className="camera-actions mt-4">
@@ -550,17 +584,7 @@ const Report = () => {
                    <div className="card p-0 overflow-hidden bg-black group shadow-xl capture-preview-card" style={{ position: 'relative' }}>
                      <img src={image} className="w-full h-full object-cover transition-all duration-700 opacity-90" style={{ display: 'block' }} alt="Captured issue" />
 
-                     {analyzing && (
-                        <div className="ai-scanning-overlay" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 10 }}>
-                          <div className="scanner-line"></div>
-                          <div className="scanner-text">AI SCANNING</div>
-                          <div className="scanner-corners">
-                            <i></i><i></i><i></i><i></i>
-                          </div>
-                        </div>
-                     )}
-
-                     {aiData && !analyzing && !aiData.rejected && (
+                     {aiData && !aiData.rejected && (
                         <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 20 }}>
                           <div className="bg-signal-green/20 backdrop-blur-md border border-signal-green text-signal-green px-3 py-1.5 rounded-full text-xs font-mono font-semibold shadow-[0_0_15px_rgba(34,197,94,0.3)]" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                             <CheckCircle2 size={14} /> AI VERIFIED
@@ -583,26 +607,14 @@ const Report = () => {
                        <span className="validation-label">Road Score</span>
                        <span className="validation-value">{roadImageScore ?? '--'}%</span>
                      </div>
-                     <div className="validation-metric">
-                       <span className="validation-label">Category Scan</span>
-                       <span className="validation-value">
-                         {analyzing
-                           ? 'Running'
-                           : aiData
-                             ? `${aiData.confidence}%`
-                             : '--'}
-                       </span>
-                     </div>
                    </div>
 
-                   {aiData ? (
+                   {aiData && (
                      <p className={`validation-summary-note ${aiData.rejected ? 'validation-summary-note-fail' : ''}`}>
                        {aiData.rejected
                          ? `Rejected: ${aiData.summary}`
                          : `Detected ${aiData.category.toUpperCase()} with ${aiData.confidence}% confidence.`}
                      </p>
-                   ) : (
-                     <p className="validation-summary-note">Select category after road verification to run confidence scan.</p>
                    )}
                  </div>
 
@@ -775,15 +787,38 @@ const Report = () => {
                     shouldDisableDeploy ? 'opacity-50 pointer-events-none grayscale' : 'hover:shadow-[0_0_20px_rgba(245,158,11,0.3)]'
                     }`}
                  >
-                    {analyzing
-                     ? 'System Analyzing...'
-                     : isSubmittingReport
+                    {isSubmittingReport
                       ? 'Uploading Media...'
                       : similarReports.length > 0
                         ? 'Use Support Existing Issue'
                         : 'Deploy Report Protocol'} <ChevronRight size={18} />
                  </button>
-                    {submitError ? <p className="text-dim mb-8" style={{ color: 'var(--signal-red)' }}>{submitError}</p> : null}
+                    {submitError ? (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }} 
+                        animate={{ opacity: 1, y: 0, scale: 1 }} 
+                        className="mb-8 p-4 rounded-xl flex items-start gap-3 text-left w-full mx-auto"
+                        style={{ 
+                          border: '1px solid rgba(255, 75, 75, 0.3)', 
+                          backgroundColor: 'rgba(255, 75, 75, 0.1)', 
+                          boxShadow: '0 8px 32px rgba(255, 75, 75, 0.15)' 
+                        }}
+                      >
+                        <AlertTriangle color="var(--signal-red)" className="shrink-0 mt-0.5" size={20} />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium leading-snug" style={{ color: '#ffb3b3' }}>
+                            {submitError.startsWith('AI Rejected:') ? (
+                              <>
+                                <span style={{ color: 'var(--signal-red)', display: 'block', marginBottom: '4px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.75rem' }}>AI Validation Failed</span>
+                                {submitError.replace('AI Rejected:', '').trim()}
+                              </>
+                            ) : (
+                              submitError
+                            )}
+                          </p>
+                        </div>
+                      </motion.div>
+                    ) : null}
                </div>
              </div>
           </motion.div>

@@ -34,7 +34,6 @@ const mapAnnouncementRow = (row) => ({
   category: row.category,
   priority: row.priority,
   district: row.district,
-  ward: row.ward,
   startsAt: row.starts_at,
   expiresAt: row.expires_at,
 })
@@ -239,9 +238,8 @@ export const createReport = async (req, res, next) => {
       `SELECT id, location_lat, location_lng FROM reports
        WHERE category = $1
        AND district = $2
-       AND status NOT IN ('resolved', 'rejected')
-       AND NOT ($3 = ANY(supporters))`,
-      [category, district.trim(), req.user.sub]
+       AND status NOT IN ('resolved', 'rejected')`,
+      [category, district.trim()]
     )
 
     let mergeTargetId = null
@@ -255,7 +253,7 @@ export const createReport = async (req, res, next) => {
     if (mergeTargetId) {
       const update = await client.query(
         `UPDATE reports
-         SET supporters = array_append(supporters, $1),
+         SET supporters = array_append(array_remove(supporters, $1), $1),
              updated_at = NOW()
          WHERE id = $2
          RETURNING *`,
@@ -333,7 +331,7 @@ export const createReport = async (req, res, next) => {
 
     const relatedAnnouncementsResult = await pool.query(
       `
-      SELECT id, title, message, category, priority, district, ward, starts_at, expires_at
+      SELECT id, title, message, category, priority, district, starts_at, expires_at
       FROM announcements
       WHERE is_published = TRUE
         AND starts_at <= NOW()

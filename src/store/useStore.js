@@ -720,6 +720,69 @@ const useStore = create((set, get) => ({
     }
   },
 
+  // Offline Sync Queue
+  offlineReports: JSON.parse(localStorage.getItem('rw_offline_reports') || '[]'),
+  saveOfflineReport: (reportData) => set((state) => {
+    const updated = [...state.offlineReports, reportData]
+    localStorage.setItem('rw_offline_reports', JSON.stringify(updated))
+    return { offlineReports: updated }
+  }),
+  removeOfflineReport: (id) => set((state) => {
+    const updated = state.offlineReports.filter(r => r.offlineId !== id)
+    localStorage.setItem('rw_offline_reports', JSON.stringify(updated))
+    return { offlineReports: updated }
+  }),
+  syncOfflineReports: async () => {
+    const { offlineReports, removeOfflineReport, createReport, token } = get()
+    if (!token || offlineReports.length === 0) return
+
+    for (const report of offlineReports) {
+      try {
+        let mediaIds = report.mediaIds || []
+        
+        // If it was saved with a base64 image and no mediaIds, upload it first
+        if (mediaIds.length === 0 && report.imageBase64) {
+          try {
+            // Convert base64 to blob
+            const response = await fetch(report.imageBase64)
+            const blob = await response.blob()
+            const file = new File([blob], 'offline-capture.jpg', { type: 'image/jpeg' })
+            
+            const formData = new FormData()
+            formData.append('file', file)
+
+            const uploadRes = await fetch(`${API_BASE_URL}/api/media/upload`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              body: formData,
+            })
+
+            const uploadData = await uploadRes.json()
+            if (uploadRes.ok && uploadData.media) {
+              mediaIds = [uploadData.media.id]
+            } else if (uploadData.code === 'AI_REJECTED') {
+              // If AI rejects it during sync, just remove it from queue
+              removeOfflineReport(report.offlineId)
+              continue
+            } else {
+              throw new Error('Upload failed during sync')
+            }
+          } catch (e) {
+             console.error('Offline image upload failed during sync:', e)
+             continue // Try next report
+          }
+        }
+
+        if (mediaIds.length > 0) {
+          await createReport({ ...report.payload, mediaIds })
+          removeOfflineReport(report.offlineId)
+        }
+      } catch (err) {
+        console.error('Failed to sync offline report', err)
+      }
+    }
+  },
+
   supportReport: async (id) => {
     const token = get().token
     if (!token) throw new Error('Not authenticated')
@@ -761,7 +824,10 @@ const useStore = create((set, get) => ({
 
     const data = await response.json()
     if (!response.ok) {
-      throw new Error(data.message || 'Could not upload image')
+      const error = new Error(data.message || 'Could not upload image')
+      error.code = data.code
+      error.ai = data.ai
+      throw error
     }
 
     return {

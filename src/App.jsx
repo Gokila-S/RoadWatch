@@ -30,7 +30,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 }
 
 function App() {
-  const { fetchCurrentUser, fetchReports, fetchAnalytics, fetchDistrictAdmins, fetchAnnouncements, token } = useStore()
+  const { fetchCurrentUser, fetchReports, fetchAnalytics, fetchDistrictAdmins, fetchAnnouncements, token, syncOfflineReports } = useStore()
 
   useEffect(() => {
     if (!token) return
@@ -39,6 +39,9 @@ function App() {
       const currentUser = await fetchCurrentUser()
       await fetchReports()
       await fetchAnnouncements()
+      
+      // Sync any offline reports
+      await syncOfflineReports()
 
       if (['district_admin', 'super_admin'].includes(currentUser?.role)) {
         await fetchAnalytics()
@@ -52,7 +55,17 @@ function App() {
     bootstrap().catch((error) => {
       console.error('Failed to bootstrap app data', error)
     })
-  }, [token, fetchCurrentUser, fetchReports, fetchAnalytics, fetchDistrictAdmins, fetchAnnouncements])
+
+    const handleOnline = () => {
+      syncOfflineReports().catch(console.error)
+    }
+
+    window.addEventListener('online', handleOnline)
+    
+    return () => {
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [token, fetchCurrentUser, fetchReports, fetchAnalytics, fetchDistrictAdmins, fetchAnnouncements, syncOfflineReports])
 
   return (
     <div className="app">
