@@ -11,7 +11,7 @@ const MIN_CATEGORY_CONFIDENCE = 60
 
 const Report = () => {
   const navigate = useNavigate()
-  const { createReport, uploadReportMedia, fetchRelatedAnnouncements, checkSimilarReports, supportReport } = useStore()
+  const { createReport, uploadReportMedia, fetchRelatedAnnouncements, checkSimilarReports, supportReport, token } = useStore()
   const [step, setStep] = useState(1) // 1: Camera Focus, 2: Details Focus, 3: Success
   const [image, setImage] = useState(null)
   const [imageFile, setImageFile] = useState(null)
@@ -53,29 +53,33 @@ const Report = () => {
   const shouldDisableDeploy = isSupportingIssue || similarReports.length > 0
 
   const analyzeRoadLikelihood = async (file) => {
-    const formData = new FormData();
-    formData.append("image", file);
-    const rawAiUrl = import.meta.env.VITE_AI_SERVICE_URL || 'http://127.0.0.1:5000'
-    const AI_URL = rawAiUrl.replace(/\/$/, '')
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'
+    const url = `${API_BASE.replace(/\/$/, '')}/api/media/scan`
+
     try {
-      const response = await fetch(`${AI_URL}/predict`, {
-        method: "POST",
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
-      });
+      })
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return { score: 0, rejected: true, raw: null, isError: true, errorMessage: errorData.error || `Server Error ${response.status}` };
+        const errorData = await response.json().catch(() => ({}))
+        return { score: 0, rejected: true, raw: null, isError: true, errorMessage: errorData.message || `Server Error ${response.status}` }
       }
-      const data = await response.json();
-      return { 
-        score: Math.round(data.confidence * 100), 
+      const payload = await response.json()
+      const data = payload.ai || payload
+      return {
+        score: Math.round((data.confidence || 0) * 100),
         rejected: !data.store_in_db,
         raw: data,
-        isError: false
-      };
+        isError: false,
+      }
     } catch (err) {
-      console.error("AI Service Error:", err);
-      return { score: 0, rejected: true, raw: null, isError: true, errorMessage: err.message };
+      console.error('AI Service Error:', err)
+      return { score: 0, rejected: true, raw: null, isError: true, errorMessage: err.message }
     }
   }
 

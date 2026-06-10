@@ -20,7 +20,22 @@ logger = logging.getLogger(__name__)
 
 # ── App Setup ────────────────────────────────────────────────────────────────
 app = Flask(__name__)
-CORS(app)
+
+# Configure CORS explicitly. In production set `AI_ALLOWED_ORIGINS`
+# to a comma-separated list of trusted frontends (example: https://app.example.com)
+raw_origins = os.environ.get("AI_ALLOWED_ORIGINS", "*")
+if raw_origins.strip() == "*":
+    cors_origins = "*"
+else:
+    cors_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+
+CORS(
+    app,
+    resources={r"/predict": {"origins": cors_origins}, r"/": {"origins": cors_origins}, r"/health": {"origins": cors_origins}},
+    supports_credentials=True,
+    expose_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization"],
+)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 MODEL_PATH      = os.path.join("model", "road_damage_filter_model.keras")
@@ -124,7 +139,7 @@ def index():
     return jsonify({"status": "online", "service": "RoadWatch AI Filter API"}), 200
 
 
-@app.route("/predict", methods=["POST"])
+@app.route("/predict", methods=["POST", "OPTIONS"])
 def predict():
     """
     Accepts a multipart/form-data POST with field name 'image'.
@@ -187,6 +202,25 @@ def predict():
             os.remove(temp_path)
         logger.exception("Prediction error: %s", exc)
         return jsonify({"error": f"Prediction failed: {str(exc)}"}), 500
+
+
+# Defensive fallback: ensure CORS headers are present on all responses
+@app.after_request
+def _add_cors_headers(response):
+    # If flask-cors already added headers, this will be a no-op for those keys
+    origin = os.environ.get("AI_ALLOWED_ORIGINS", "*")
+    # Only echo specific origin when credentials are supported; avoid wildcard with credentials
+    if origin.strip() == "*":
+        response.headers.setdefault("Access-Control-Allow-Origin", "*")
+    else:
+        # When multiple origins are configured, mirror the request Origin if it matches
+        req_origin = request.headers.get("Origin")
+        if req_origin and req_origin in [o.strip() for o in origin.split(",")]:
+            response.headers.setdefault("Access-Control-Allow-Origin", req_origin)
+    response.headers.setdefault("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+    response.headers.setdefault("Access-Control-Allow-Headers", "Content-Type,Authorization")
+    response.headers.setdefault("Access-Control-Allow-Credentials", "true")
+    return response
 
 
 @app.route("/health", methods=["GET"])
