@@ -6,6 +6,7 @@ Loads a Keras binary classifier and exposes a /predict endpoint.
 import os
 import uuid
 import logging
+from pathlib import Path
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from PIL import Image
@@ -38,7 +39,8 @@ CORS(
 )
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-MODEL_PATH      = os.path.join("model", "road_damage_filter_model.keras")
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH      = BASE_DIR / "model" / "road_damage_filter_model.keras"
 UPLOAD_FOLDER   = "uploads"
 IMAGE_SIZE      = (224, 224)
 SIGMOID_THRESH  = 0.5    # class boundary
@@ -75,11 +77,12 @@ cleanup_uploads()
 
 # ── Model Loading (once at startup) ──────────────────────────────────────────
 model = None
+model_load_attempted = False
 
 def load_keras_model():
     """Load the Keras model from disk exactly once."""
     global model
-    if not os.path.exists(MODEL_PATH):
+    if not MODEL_PATH.exists():
         logger.error("Model file not found at: %s", MODEL_PATH)
         return False
     try:
@@ -108,14 +111,22 @@ def load_keras_model():
         Dense.__init__ = patched_init
         # ────────────────────────────────────────────────────────────────────────
 
-        model = keras.models.load_model(MODEL_PATH)
+        model = keras.models.load_model(str(MODEL_PATH))
         logger.info("✅ Model loaded successfully from %s", MODEL_PATH)
         return True
     except Exception as exc:
         logger.exception("❌ Failed to load model: %s", exc)
         return False
 
-load_keras_model()
+def get_model():
+    """Lazily load the model so the service can start fast on Render."""
+    global model_load_attempted
+    if model is not None:
+        return model
+    if not model_load_attempted:
+        model_load_attempted = True
+        load_keras_model()
+    return model
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -167,7 +178,8 @@ def predict():
     Returns JSON: { prediction, confidence, store_in_db }
     """
     # ── Model availability check ──
-    if model is None:
+    current_model = get_model()
+    if current_model is None:
         return jsonify({
             "error": "Model is not loaded. Place the .keras file in the model/ folder and restart."
         }), 503
@@ -197,7 +209,7 @@ def predict():
         img_array = preprocess_image(temp_path)
 
         # ── Predict ──
-        raw = float(model.predict(img_array, verbose=0)[0][0])
+        raw = float(current_model.predict(img_array, verbose=0)[0][0])
         logger.info("Raw sigmoid output: %.4f", raw)
 
         label, confidence, store_in_db = interpret_prediction(raw)

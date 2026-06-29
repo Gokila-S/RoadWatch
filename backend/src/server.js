@@ -1,5 +1,6 @@
 import cors from 'cors'
 import express from 'express'
+import net from 'net'
 import authRouter from './routes/auth.routes.js'
 import adminRouter from './routes/admin.routes.js'
 import reportsRouter from './routes/reports.routes.js'
@@ -15,6 +16,25 @@ import { errorHandler } from './middleware/errorHandler.js'
 const app = express()
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const isPortInUse = (port) => new Promise((resolve) => {
+  const tester = net.createServer()
+
+  tester.once('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      resolve(true)
+      return
+    }
+
+    resolve(false)
+  })
+
+  tester.once('listening', () => {
+    tester.close(() => resolve(false))
+  })
+
+  tester.listen(port, '0.0.0.0')
+})
 
 const bootstrapDatabase = async () => {
   const maxAttempts = 5
@@ -60,10 +80,24 @@ app.use('/api/announcements', announcementsRouter)
 app.use(errorHandler)
 
 const startServer = async () => {
+  if (await isPortInUse(env.port)) {
+    console.error(`Port ${env.port} is already in use. Stop the existing RoadWatch API process before starting another instance.`)
+    return
+  }
+
   await bootstrapDatabase()
 
-  app.listen(env.port, () => {
+  const server = app.listen(env.port, () => {
     console.log(`RoadWatch API running on http://localhost:${env.port}`)
+  })
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`Port ${env.port} is already in use. Stop the existing RoadWatch API process before starting another instance.`)
+      return
+    }
+
+    throw error
   })
 }
 

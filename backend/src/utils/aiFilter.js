@@ -23,40 +23,61 @@ import { env } from '../config/env.js'
  * @returns {Promise<AiFilterResult>}
  */
 export async function classifyImage(imageBuffer, originalName = 'image.jpg') {
-  const form = new FormData()
-  form.append('image', imageBuffer, {
-    filename: originalName,
-    contentType: guessMime(originalName),
-  })
-
   let response
-  let timeoutId
+  let attempt = 0
+  const maxAttempts = 3
   try {
     // Node runtimes differ in support for AbortSignal.timeout — use AbortController
-    const controller = new AbortController()
-    timeoutId = setTimeout(() => controller.abort(), 30_000)
+    while (attempt < maxAttempts) {
+      attempt += 1
+      const form = new FormData()
+      form.append('image', imageBuffer, {
+        filename: originalName,
+        contentType: guessMime(originalName),
+      })
 
-    response = await fetch(`${env.aiServiceUrl}/predict`, {
-      method: 'POST',
-      body: form,
-      headers: form.getHeaders(),
-      signal: controller.signal,
-    })
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30_000)
+
+      try {
+        response = await fetch(`${env.aiServiceUrl}/predict`, {
+          method: 'POST',
+          body: form,
+          headers: form.getHeaders(),
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timeoutId)
+      }
+
+      if (response.status !== 429 || attempt >= maxAttempts) {
+        break
+      }
+
+      const retryAfterHeader = Number(response.headers.get('retry-after'))
+      const retryDelayMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
+        ? retryAfterHeader * 1000
+        : 1000 * attempt
+
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+    }
   } catch (networkErr) {
     const isTimeout = networkErr?.name === 'AbortError' || networkErr?.name === 'TimeoutError'
     const msg = isTimeout
       ? 'AI service timed out. Please try again.'
       : `AI service is unreachable. Ensure the model server is running (${env.aiServiceUrl}).`
     throw Object.assign(new Error(msg), { status: 503, code: 'AI_UNAVAILABLE' })
-  } finally {
-    if (timeoutId) clearTimeout(timeoutId)
   }
 
   const body = await response.json().catch(() => ({}))
 
   if (!response.ok) {
+    const isRateLimited = response.status === 429
     const msg = body?.error || `AI service returned HTTP ${response.status}`
-    throw Object.assign(new Error(msg), { status: 502, code: 'AI_ERROR' })
+    throw Object.assign(new Error(msg), {
+      status: isRateLimited ? 503 : 502,
+      code: isRateLimited ? 'AI_RATE_LIMIT' : 'AI_ERROR',
+    })
   }
 
   return {
