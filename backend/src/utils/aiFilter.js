@@ -30,18 +30,26 @@ export async function classifyImage(imageBuffer, originalName = 'image.jpg') {
   })
 
   let response
+  let timeoutId
   try {
+    // Node runtimes differ in support for AbortSignal.timeout — use AbortController
+    const controller = new AbortController()
+    timeoutId = setTimeout(() => controller.abort(), 30_000)
+
     response = await fetch(`${env.aiServiceUrl}/predict`, {
       method: 'POST',
       body: form,
       headers: form.getHeaders(),
-      signal: AbortSignal.timeout(30_000), // 30 s max
+      signal: controller.signal,
     })
   } catch (networkErr) {
-    const msg = networkErr?.name === 'TimeoutError'
+    const isTimeout = networkErr?.name === 'AbortError' || networkErr?.name === 'TimeoutError'
+    const msg = isTimeout
       ? 'AI service timed out. Please try again.'
       : `AI service is unreachable. Ensure the model server is running (${env.aiServiceUrl}).`
     throw Object.assign(new Error(msg), { status: 503, code: 'AI_UNAVAILABLE' })
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId)
   }
 
   const body = await response.json().catch(() => ({}))

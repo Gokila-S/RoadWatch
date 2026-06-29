@@ -52,6 +52,27 @@ app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# Cleanup old uploaded files on startup to avoid disk growth.
+def cleanup_uploads(max_age_days: int = 7):
+    try:
+        now = __import__('time').time()
+        max_age_seconds = max_age_days * 24 * 60 * 60
+        for name in os.listdir(UPLOAD_FOLDER):
+            path = os.path.join(UPLOAD_FOLDER, name)
+            try:
+                if not os.path.isfile(path):
+                    continue
+                mtime = os.path.getmtime(path)
+                if (now - mtime) > max_age_seconds:
+                    os.remove(path)
+                    logger.info('Removed old upload: %s', path)
+            except Exception:
+                logger.exception('Failed to evaluate/remove upload: %s', path)
+    except Exception:
+        logger.exception('Failed during uploads cleanup')
+
+cleanup_uploads()
+
 # ── Model Loading (once at startup) ──────────────────────────────────────────
 model = None
 

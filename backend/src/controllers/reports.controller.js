@@ -55,7 +55,7 @@ const calculateDistanceKm = (lat1, lon1, lat2, lon2) => {
 
 export const listReports = async (req, res, next) => {
   try {
-    const { status, severity, district, scope, lat, lng, radiusKm } = req.query
+    const { status, severity, district, category, scope, lat, lng, radiusKm, limit, offset } = req.query
     const filters = []
     const values = []
     const requestedLat = Number(lat)
@@ -73,6 +73,11 @@ export const listReports = async (req, res, next) => {
     if (severity) {
       values.push(severity)
       filters.push(`r.severity = $${values.length}`)
+    }
+
+    if (category) {
+      values.push(category)
+      filters.push(`r.category = $${values.length}`)
     }
 
     if (district) {
@@ -94,6 +99,9 @@ export const listReports = async (req, res, next) => {
     filters.push(`r.district = ANY($${values.length}::text[])`)
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : ''
+    // Pagination: support `limit` and `offset` query params with sensible bounds
+    const lim = Math.min(100, Math.max(1, Number(limit) || 50))
+    const off = Math.max(0, Number(offset) || 0)
 
     const query = `
       SELECT
@@ -106,7 +114,11 @@ export const listReports = async (req, res, next) => {
       JOIN profiles reporter ON reporter.id = r.reported_by
       ${whereClause}
       ORDER BY r.created_at DESC
+      LIMIT $${values.length + 1}
+      OFFSET $${values.length + 2}
     `
+
+    values.push(lim, off)
 
     const result = await pool.query(query, values)
     const mappedReports = result.rows.map(mapReportRow)

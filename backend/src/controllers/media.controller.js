@@ -54,15 +54,19 @@ export const uploadReportMedia = async (req, res, next) => {
     }
 
     // ── AI Road-Damage Filter ────────────────────────────────────────────────
-    let aiResult
-    try {
-      aiResult = await classifyImage(file.buffer, file.originalname)
-    } catch (aiErr) {
-      // Surface AI service errors with appropriate status codes
-      return res.status(aiErr.status || 503).json({
-        message: aiErr.message,
-        code: aiErr.code || 'AI_UNAVAILABLE',
-      })
+    // Reuse recent scan result if available (attached by middleware) to avoid
+    // calling the AI service twice for the same image.
+    let aiResult = req.aiScanResult || null
+    if (!aiResult) {
+      try {
+        aiResult = await classifyImage(file.buffer, file.originalname)
+      } catch (aiErr) {
+        // Surface AI service errors with appropriate status codes
+        return res.status(aiErr.status || 503).json({
+          message: aiErr.message,
+          code: aiErr.code || 'AI_UNAVAILABLE',
+        })
+      }
     }
 
     // Reject images that are not classified as road damage with ≥ 80 % confidence
