@@ -1,13 +1,13 @@
 """
 RoadWatch Filter App - Flask Backend
-Loads a Keras binary classifier and exposes a /predict endpoint.
+Loads an ONNX road-damage classifier and exposes a /predict endpoint.
 """
 
 import os
 import uuid
 import logging
 from pathlib import Path
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from PIL import Image
 import numpy as np
@@ -40,7 +40,7 @@ CORS(
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_PATH      = BASE_DIR / "model" / "road_damage_filter_model.keras"
+MODEL_PATH      = BASE_DIR / "model" / "road_damage_filter_model.onnx"
 UPLOAD_FOLDER   = "uploads"
 IMAGE_SIZE      = (224, 224)
 SIGMOID_THRESH  = 0.5    # class boundary
@@ -75,58 +75,48 @@ def cleanup_uploads(max_age_days: int = 7):
 
 cleanup_uploads()
 
-# ── Model Loading (once at startup) ──────────────────────────────────────────
-model = None
+# ── Model Loading (ONNX Runtime — lightweight, ~30 MB RAM) ──────────────────
+model_session = None
+model_input_name = None
 model_load_attempted = False
 
-def load_keras_model():
-    """Load the Keras model from disk exactly once."""
-    global model
+def load_onnx_model():
+    """Load the ONNX model from disk exactly once."""
+    global model_session, model_input_name
     if not MODEL_PATH.exists():
         logger.error("Model file not found at: %s", MODEL_PATH)
+        logger.error("Run 'python convert_to_onnx.py' first to create the ONNX model.")
         return False
     try:
-        # Force single-threaded CPU execution to prevent OOM on Render Free Tier
-        os.environ["OMP_NUM_THREADS"] = "1"
-        os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
-        os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+        import onnxruntime as ort
 
-        # Use Keras 3 (standalone)
-        import keras
-        import tensorflow as tf
-        
-        tf.config.threading.set_intra_op_parallelism_threads(1)
-        tf.config.threading.set_inter_op_parallelism_threads(1)
-        
-        logger.info("Using Keras %s with TensorFlow backend %s", keras.__version__, tf.__version__)
+        # Use minimal session options for low memory
+        opts = ort.SessionOptions()
+        opts.inter_op_num_threads = 1
+        opts.intra_op_num_threads = 1
+        opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
-        # ── Patch for quantization_config compatibility ──────────────────────────
-        # Newer Keras versions might include 'quantization_config' in serialized 
-        # layers which older/different versions don't recognize.
-        from keras.layers import Dense
-        original_init = Dense.__init__
-        def patched_init(self, *args, **kwargs):
-            kwargs.pop('quantization_config', None)
-            return original_init(self, *args, **kwargs)
-        Dense.__init__ = patched_init
-        # ────────────────────────────────────────────────────────────────────────
+        model_session = ort.InferenceSession(str(MODEL_PATH), sess_options=opts)
+        model_input_name = model_session.get_inputs()[0].name
 
-        model = keras.models.load_model(str(MODEL_PATH))
-        logger.info("✅ Model loaded successfully from %s", MODEL_PATH)
+        logger.info("✅ ONNX model loaded successfully from %s", MODEL_PATH)
+        logger.info("   Input name: %s, shape: %s",
+                     model_input_name,
+                     model_session.get_inputs()[0].shape)
         return True
     except Exception as exc:
-        logger.exception("❌ Failed to load model: %s", exc)
+        logger.exception("❌ Failed to load ONNX model: %s", exc)
         return False
 
 def get_model():
     """Lazily load the model so the service can start fast on Render."""
     global model_load_attempted
-    if model is not None:
-        return model
+    if model_session is not None:
+        return model_session
     if not model_load_attempted:
         model_load_attempted = True
-        load_keras_model()
-    return model
+        load_onnx_model()
+    return model_session
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -168,7 +158,7 @@ def interpret_prediction(raw_output: float):
 
 @app.route("/")
 def index():
-    return jsonify({"status": "online", "service": "RoadWatch AI Filter API"}), 200
+    return jsonify({"status": "online", "service": "RoadWatch AI Filter API", "runtime": "onnxruntime"}), 200
 
 
 @app.route("/predict", methods=["POST", "OPTIONS"])
@@ -178,10 +168,10 @@ def predict():
     Returns JSON: { prediction, confidence, store_in_db }
     """
     # ── Model availability check ──
-    current_model = get_model()
-    if current_model is None:
+    current_session = get_model()
+    if current_session is None:
         return jsonify({
-            "error": "Model is not loaded. Place the .keras file in the model/ folder and restart."
+            "error": "Model is not loaded. Run convert_to_onnx.py and place the .onnx file in the model/ folder."
         }), 503
 
     # ── File presence check ──
@@ -208,8 +198,9 @@ def predict():
         # ── Preprocess ──
         img_array = preprocess_image(temp_path)
 
-        # ── Predict ──
-        raw = float(current_model.predict(img_array, verbose=0)[0][0])
+        # ── Predict (ONNX Runtime) ──
+        outputs = current_session.run(None, {model_input_name: img_array})
+        raw = float(outputs[0][0][0])
         logger.info("Raw sigmoid output: %.4f", raw)
 
         label, confidence, store_in_db = interpret_prediction(raw)
@@ -260,7 +251,8 @@ def _add_cors_headers(response):
 def health():
     return jsonify({
         "status":       "ok",
-        "model_loaded": model is not None,
+        "model_loaded": model_session is not None,
+        "runtime":      "onnxruntime",
     })
 
 
