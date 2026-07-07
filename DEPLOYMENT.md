@@ -34,16 +34,21 @@ This guide provides step-by-step instructions for deploying the **RoadWatch** pl
 
 ---
 
-## 4. AI Service Deployment (Flask + Keras)
+## 4. AI Service Deployment (Flask + ONNX Runtime)
 **Recommended Hosting**: [Render](https://render.com/) (Web Service with Python) or [Railway](https://railway.app/).
 
 1. Navigate to the `ai_service/` directory.
-2. Ensure the `model/road_damage_filter_model.keras` file is included in your repository.
+2. Ensure the `model/road_damage_filter_model.onnx` file is included in your repository.
 3. Deploy as a Python service.
-4. Build Command: `pip install -r requirements.txt`.
-5. Start Command: `gunicorn --bind 0.0.0.0:$PORT app:app`.
-   > [!NOTE]
-   > Use `gunicorn` for production instead of the built-in Flask server.
+4. Set the following environment variables if deploying on Render's Free tier:
+   - `DISABLE_CLIP=true`
+     > [!IMPORTANT]
+     > Render's free tier has a 512 MB RAM limit. Loading the 600 MB CLIP model (Stage 2) alongside PyTorch will exceed this limit and cause the Gunicorn worker to crash (`Worker was sent SIGKILL! Perhaps out of memory?`). Setting `DISABLE_CLIP=true` forces the service to bypass CLIP and run only the lightweight, 30 MB ONNX road damage detector.
+5. If running on a higher-resource tier (>= 1 GB RAM) with `DISABLE_CLIP=false`, optimize deployment build by running:
+   - Build Command: `pip install -r requirements.txt && python -c "from transformers import pipeline; pipeline('zero-shot-image-classification', model='openai/clip-vit-base-patch32')"`
+     > [!TIP]
+     > Pre-downloading the model weights during the build phase prevents Gunicorn request timeouts (`WORKER TIMEOUT`) on the first request.
+6. Start Command: `gunicorn --bind 0.0.0.0:$PORT --timeout 120 app:app`.
 
 ---
 

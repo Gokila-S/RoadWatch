@@ -52,6 +52,8 @@ IMAGE_SIZE      = (224, 224)
 SIGMOID_THRESH  = 0.5    # class boundary
 CONFIDENCE_THRESH = 0.80  # store-or-reject boundary
 
+DISABLE_CLIP = os.environ.get("DISABLE_CLIP", "false").lower() in ("true", "1", "yes")
+
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "bmp"}
 MAX_CONTENT_LENGTH = 10 * 1024 * 1024  # 10 MB
 
@@ -259,6 +261,9 @@ def classify():
     CLIP-based 3-class road condition classifier.
     Returns: { label, confidence, scores, description }
     """
+    if DISABLE_CLIP:
+        return jsonify({"error": "CLIP classifier is disabled on this server."}), 400
+
     if "image" not in request.files:
         return jsonify({"error": "No image file provided. Use field name 'image'."}), 400
 
@@ -353,45 +358,48 @@ def pipeline():
         final_label = label_s1
         store_in_db = store_s1
 
-        try:
-            from clip_classifier import classify_road
+        if not DISABLE_CLIP:
+            try:
+                from clip_classifier import classify_road
 
-            clip_result = classify_road(file_bytes)
-            logger.info("Pipeline Stage 2 — CLIP label: %s (conf=%.4f)",
-                         clip_result["label"], clip_result["confidence"])
+                clip_result = classify_road(file_bytes)
+                logger.info("Pipeline Stage 2 — CLIP label: %s (conf=%.4f)",
+                             clip_result["label"], clip_result["confidence"])
 
-            descriptions = {
-                "pothole": "Road damage detected — potholes, cracks, or surface damage.",
-                "normal": "Road appears to be in good condition. No visible damage.",
-                "not_road": "CLIP reclassified this as not a road image.",
-            }
+                descriptions = {
+                    "pothole": "Road damage detected — potholes, cracks, or surface damage.",
+                    "normal": "Road appears to be in good condition. No visible damage.",
+                    "not_road": "CLIP reclassified this as not a road image.",
+                }
 
-            stage2 = {
-                "label": clip_result["label"],
-                "confidence": round(clip_result["confidence"], 4),
-                "scores": clip_result["scores"],
-                "description": descriptions.get(clip_result["label"], ""),
-            }
+                stage2 = {
+                    "label": clip_result["label"],
+                    "confidence": round(clip_result["confidence"], 4),
+                    "scores": clip_result["scores"],
+                    "description": descriptions.get(clip_result["label"], ""),
+                }
 
-            # Align constraints
-            if clip_result["label"] == "pothole":
-                final_label = "pothole"
-                store_in_db = True
-                stage1["passed"] = True
-            elif clip_result["label"] == "normal":
-                final_label = "normal"
-                store_in_db = True  # allow with warning popup
-                stage1["passed"] = True
-            else:
-                final_label = "not_road"
-                store_in_db = False
-                stage1["passed"] = False
+                # Align constraints
+                if clip_result["label"] == "pothole":
+                    final_label = "pothole"
+                    store_in_db = True
+                    stage1["passed"] = True
+                elif clip_result["label"] == "normal":
+                    final_label = "normal"
+                    store_in_db = True  # allow with warning popup
+                    stage1["passed"] = True
+                else:
+                    final_label = "not_road"
+                    store_in_db = False
+                    stage1["passed"] = False
 
-        except Exception as clip_err:
-            logger.warning("Pipeline: CLIP classification failed, proceeding with Stage 1 result only: %s", clip_err)
-            if not store_s1:
-                store_in_db = False
-                final_label = label_s1
+            except Exception as clip_err:
+                logger.warning("Pipeline: CLIP classification failed, proceeding with Stage 1 result only: %s", clip_err)
+                if not store_s1:
+                    store_in_db = False
+                    final_label = label_s1
+        else:
+            logger.info("Pipeline: CLIP classification skipped (DISABLE_CLIP is set to True)")
 
         # Keep or discard temp file
         if store_in_db:
@@ -421,29 +429,34 @@ def pipeline():
 @app.route("/health", methods=["GET"])
 def health():
     clip_ready = False
-    try:
-        from clip_classifier import is_model_ready
-        clip_ready = is_model_ready()
-    except Exception:
-        pass
+    if not DISABLE_CLIP:
+        try:
+            from clip_classifier import is_model_ready
+            clip_ready = is_model_ready()
+        except Exception:
+            pass
 
     return jsonify({
         "status":       "ok",
         "model_loaded": model_session is not None,
         "clip_loaded":  clip_ready,
-        "runtime":      "onnxruntime + clip",
+        "clip_disabled": DISABLE_CLIP,
+        "runtime":      "onnxruntime" + (" + clip" if not DISABLE_CLIP else ""),
     })
 
 
 # ── Entry Point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    # Pre-load the CLIP model at startup so the first /pipeline call doesn't timeout
-    logger.info("Pre-loading CLIP model at startup...")
-    try:
-        from clip_classifier import get_classifier
-        get_classifier()
-        logger.info("✅ CLIP model pre-loaded successfully")
-    except Exception as e:
-        logger.warning("⚠️ Could not pre-load CLIP model: %s (will retry on first request)", e)
+    if not DISABLE_CLIP:
+        # Pre-load the CLIP model at startup so the first /pipeline call doesn't timeout
+        logger.info("Pre-loading CLIP model at startup...")
+        try:
+            from clip_classifier import get_classifier
+            get_classifier()
+            logger.info("✅ CLIP model pre-loaded successfully")
+        except Exception as e:
+            logger.warning("⚠️ Could not pre-load CLIP model: %s (will retry on first request)", e)
+    else:
+        logger.info("CLIP model pre-loading skipped (DISABLE_CLIP is set to True)")
 
     app.run(debug=True, host="0.0.0.0", port=5000)
