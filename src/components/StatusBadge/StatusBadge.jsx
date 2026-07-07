@@ -6,6 +6,7 @@ const STATUS_CONFIG = {
   verified: { label: 'Verified', className: 'badge-verified', dotColor: '#3b82f6' },
   assigned: { label: 'Assigned', className: 'badge-assigned', dotColor: '#a855f7' },
   resolved: { label: 'Resolved', className: 'badge-resolved', dotColor: '#22c55e' },
+  rejected: { label: 'Rejected', className: 'badge-rejected', dotColor: '#ef4444' },
 }
 
 const SEVERITY_CONFIG = {

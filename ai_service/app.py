@@ -32,7 +32,13 @@ else:
 
 CORS(
     app,
-    resources={r"/predict": {"origins": cors_origins}, r"/": {"origins": cors_origins}, r"/health": {"origins": cors_origins}},
+    resources={
+        r"/predict": {"origins": cors_origins},
+        r"/classify": {"origins": cors_origins},
+        r"/pipeline": {"origins": cors_origins},
+        r"/": {"origins": cors_origins},
+        r"/health": {"origins": cors_origins},
+    },
     supports_credentials=True,
     expose_headers=["Content-Type", "Authorization"],
     allow_headers=["Content-Type", "Authorization"],
@@ -247,15 +253,197 @@ def _add_cors_headers(response):
     return response
 
 
+@app.route("/classify", methods=["POST", "OPTIONS"])
+def classify():
+    """
+    CLIP-based 3-class road condition classifier.
+    Returns: { label, confidence, scores, description }
+    """
+    if "image" not in request.files:
+        return jsonify({"error": "No image file provided. Use field name 'image'."}), 400
+
+    file = request.files["image"]
+    if file.filename == "":
+        return jsonify({"error": "No file selected."}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({"error": f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"}), 415
+
+    try:
+        from clip_classifier import classify_road
+
+        image_bytes = file.read()
+        result = classify_road(image_bytes)
+
+        descriptions = {
+            "pothole": "Road damage detected \u2014 this road has potholes, cracks, or surface damage.",
+            "normal": "This road appears to be in good condition. No damage detected.",
+            "not_road": "This image does not appear to be a road.",
+        }
+
+        return jsonify({
+            "label":       result["label"],
+            "confidence":  result["confidence"],
+            "scores":      result["scores"],
+            "description": descriptions.get(result["label"], ""),
+        })
+    except Exception as exc:
+        logger.exception("Classification error: %s", exc)
+        return jsonify({"error": f"Classification failed: {str(exc)}"}), 500
+
+
+@app.route("/pipeline", methods=["POST", "OPTIONS"])
+def pipeline():
+    """
+    Two-stage AI pipeline:
+      Stage 1 — ONNX road-detection model (road_damage / not_road)
+      Stage 2 — CLIP damage classifier (pothole / normal / not_road)
+    Returns combined results from both stages.
+    """
+    # ── Model availability check ──
+    current_session = get_model()
+    if current_session is None:
+        return jsonify({
+            "error": "Road detection model is not loaded. Run convert_to_onnx.py first."
+        }), 503
+
+    # ── File presence check ──
+    if "image" not in request.files:
+        return jsonify({"error": "No image file provided. Use field name 'image'."}), 400
+
+    file = request.files["image"]
+
+    if file.filename == "":
+        return jsonify({"error": "No file selected."}), 400
+
+    if not allowed_file(file.filename):
+        return jsonify({
+            "error": f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+        }), 415
+
+    # ── Save to a temp path ──
+    unique_name = f"{uuid.uuid4().hex}_{file.filename}"
+    temp_path = os.path.join(UPLOAD_FOLDER, unique_name)
+    file_bytes = file.read()
+    with open(temp_path, "wb") as f:
+        f.write(file_bytes)
+    logger.info("Pipeline: saved temp file: %s", temp_path)
+
+    try:
+        # ════════════════════════════════════════════════════════════════
+        # STAGE 1: ONNX Road Detection
+        # ════════════════════════════════════════════════════════════════
+        img_array = preprocess_image(temp_path)
+        outputs = current_session.run(None, {model_input_name: img_array})
+        raw = float(outputs[0][0][0])
+        logger.info("Pipeline Stage 1 — raw sigmoid: %.4f", raw)
+
+        label_s1, confidence_s1, store_s1 = interpret_prediction(raw)
+
+        stage1 = {
+            "prediction": label_s1,
+            "confidence": round(confidence_s1, 4),
+            "passed": store_s1,
+        }
+
+        # ════════════════════════════════════════════════════════════════
+        # STAGE 2: CLIP Damage Classification
+        # ════════════════════════════════════════════════════════════════
+        stage2 = None
+        final_label = label_s1
+        store_in_db = store_s1
+
+        try:
+            from clip_classifier import classify_road
+
+            clip_result = classify_road(file_bytes)
+            logger.info("Pipeline Stage 2 — CLIP label: %s (conf=%.4f)",
+                         clip_result["label"], clip_result["confidence"])
+
+            descriptions = {
+                "pothole": "Road damage detected — potholes, cracks, or surface damage.",
+                "normal": "Road appears to be in good condition. No visible damage.",
+                "not_road": "CLIP reclassified this as not a road image.",
+            }
+
+            stage2 = {
+                "label": clip_result["label"],
+                "confidence": round(clip_result["confidence"], 4),
+                "scores": clip_result["scores"],
+                "description": descriptions.get(clip_result["label"], ""),
+            }
+
+            # Align constraints
+            if clip_result["label"] == "pothole":
+                final_label = "pothole"
+                store_in_db = True
+                stage1["passed"] = True
+            elif clip_result["label"] == "normal":
+                final_label = "normal"
+                store_in_db = True  # allow with warning popup
+                stage1["passed"] = True
+            else:
+                final_label = "not_road"
+                store_in_db = False
+                stage1["passed"] = False
+
+        except Exception as clip_err:
+            logger.warning("Pipeline: CLIP classification failed, proceeding with Stage 1 result only: %s", clip_err)
+            if not store_s1:
+                store_in_db = False
+                final_label = label_s1
+
+        # Keep or discard temp file
+        if store_in_db:
+            logger.info("Pipeline: ✅ ACCEPTED — %s", final_label)
+        else:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            logger.info("Pipeline: 🚫 REJECTED by CLIP — %s", final_label)
+
+        return jsonify({
+            "stage1": stage1,
+            "stage2": stage2,
+            "store_in_db": store_in_db,
+            "final_label": final_label,
+            "prediction": "road_damage" if final_label in ["pothole", "normal"] else "not_road",
+            "confidence": stage2["confidence"] if stage2 else round(confidence_s1, 4),
+            "filename": unique_name if store_in_db else None,
+        })
+
+    except Exception as exc:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        logger.exception("Pipeline error: %s", exc)
+        return jsonify({"error": f"Pipeline failed: {str(exc)}"}), 500
+
+
 @app.route("/health", methods=["GET"])
 def health():
+    clip_ready = False
+    try:
+        from clip_classifier import is_model_ready
+        clip_ready = is_model_ready()
+    except Exception:
+        pass
+
     return jsonify({
         "status":       "ok",
         "model_loaded": model_session is not None,
-        "runtime":      "onnxruntime",
+        "clip_loaded":  clip_ready,
+        "runtime":      "onnxruntime + clip",
     })
 
 
 # ── Entry Point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
+    # Pre-load the CLIP model at startup so the first /pipeline call doesn't timeout
+    logger.info("Pre-loading CLIP model at startup...")
+    try:
+        from clip_classifier import get_classifier
+        get_classifier()
+        logger.info("✅ CLIP model pre-loaded successfully")
+    except Exception as e:
+        logger.warning("⚠️ Could not pre-load CLIP model: %s (will retry on first request)", e)
+
     app.run(debug=True, host="0.0.0.0", port=5000)

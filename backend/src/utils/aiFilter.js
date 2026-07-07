@@ -87,6 +87,81 @@ export async function classifyImage(imageBuffer, originalName = 'image.jpg') {
   }
 }
 
+/**
+ * Run the two-stage AI pipeline: ONNX road-detection → CLIP damage classification.
+ *
+ * @param {Buffer} imageBuffer   - Raw image bytes (jpg / png / webp)
+ * @param {string} originalName  - Original filename
+ * @returns {Promise<Object>}    - { stage1, stage2, store_in_db, final_label, prediction, confidence }
+ */
+export async function classifyImagePipeline(imageBuffer, originalName = 'image.jpg') {
+  let response
+  let attempt = 0
+  const maxAttempts = 3
+  try {
+    while (attempt < maxAttempts) {
+      attempt += 1
+      const form = new FormData()
+      form.append('image', imageBuffer, {
+        filename: originalName,
+        contentType: guessMime(originalName),
+      })
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 60_000) // longer timeout for 2-stage
+
+      try {
+        response = await fetch(`${env.aiServiceUrl}/pipeline`, {
+          method: 'POST',
+          body: form,
+          headers: form.getHeaders(),
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timeoutId)
+      }
+
+      if (response.status !== 429 || attempt >= maxAttempts) {
+        break
+      }
+
+      const retryAfterHeader = Number(response.headers.get('retry-after'))
+      const retryDelayMs = Number.isFinite(retryAfterHeader) && retryAfterHeader > 0
+        ? retryAfterHeader * 1000
+        : 1000 * attempt
+
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+    }
+  } catch (networkErr) {
+    const isTimeout = networkErr?.name === 'AbortError' || networkErr?.name === 'TimeoutError'
+    const msg = isTimeout
+      ? 'AI pipeline timed out. Please try again.'
+      : `AI service is unreachable. Ensure the model server is running (${env.aiServiceUrl}).`
+    throw Object.assign(new Error(msg), { status: 503, code: 'AI_UNAVAILABLE' })
+  }
+
+  const body = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    const isRateLimited = response.status === 429
+    const msg = body?.error || `AI pipeline returned HTTP ${response.status}`
+    throw Object.assign(new Error(msg), {
+      status: isRateLimited ? 503 : 502,
+      code: isRateLimited ? 'AI_RATE_LIMIT' : 'AI_ERROR',
+    })
+  }
+
+  return {
+    stage1: body.stage1 || null,
+    stage2: body.stage2 || null,
+    store_in_db: body.store_in_db,
+    final_label: body.final_label,
+    prediction: body.prediction,
+    confidence: body.confidence,
+    filename: body.filename || null,
+  }
+}
+
 /** Best-effort mime-type from file extension */
 function guessMime(filename = '') {
   const ext = filename.split('.').pop()?.toLowerCase()

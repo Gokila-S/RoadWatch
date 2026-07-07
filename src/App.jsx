@@ -12,6 +12,7 @@ import AdminAnnouncements from './pages/AdminAnnouncements/AdminAnnouncements'
 import SuperAdmin from './pages/SuperAdmin/SuperAdmin'
 import ReportsList from './pages/ReportsList/ReportsList'
 import Analytics from './pages/Analytics/Analytics'
+import RoadChecker from './pages/RoadChecker/RoadChecker'
 import useStore from './store/useStore'
 
 // Auth Guard Component
@@ -61,6 +62,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/check-road" element={<RoadChecker />} />
           
           {/* Citizen Routes */}
           <Route

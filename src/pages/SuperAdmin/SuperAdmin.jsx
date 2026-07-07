@@ -529,8 +529,15 @@ const SuperAdmin = () => {
                   <label className="sa-label" htmlFor="district">Assigned District</label>
                   <div className="sa-input-wrap">
                     <Building2 size={14} className="sa-input-icon" />
-                    <input id="district" name="district" className={`sa-input ${formErrors.district ? 'sa-input-error' : ''}`}
-                      value={form.district} onChange={handleChange} onBlur={handleBlur} placeholder="Coimbatore" />
+                    <select id="district" name="district" className={`sa-input sa-select ${formErrors.district ? 'sa-input-error' : ''}`}
+                      value={form.district} onChange={handleChange} onBlur={handleBlur}>
+                      <option value="">Select District</option>
+                      <option value="Coimbatore">Coimbatore</option>
+                      <option value="Erode">Erode</option>
+                      <option value="Salem">Salem</option>
+                      <option value="Tiruppur">Tiruppur</option>
+                      <option value="Trichy">Trichy</option>
+                    </select>
                   </div>
                   {formErrors.district && <p className="sa-field-error">{formErrors.district}</p>}
                 </div>
@@ -592,22 +599,38 @@ const SuperAdmin = () => {
               <form onSubmit={submitEdit} noValidate>
                 <div className="sa-form-grid sa-modal-grid">
                   {[
-                    { id: 'edit_full_name', name: 'full_name', label: 'Full Name', icon: Users, placeholder: '', type: 'text' },
-                    { id: 'edit_email', name: 'email', label: 'Email', icon: Mail, placeholder: '', type: 'email' },
-                    { id: 'edit_district', name: 'district', label: 'District', icon: Building2, placeholder: '', type: 'text' },
-                    { id: 'edit_phone', name: 'phone', label: 'Phone', icon: Phone, placeholder: '', type: 'text' },
+                    { id: 'edit_full_name', name: 'full_name', label: 'Full Name', icon: Users, type: 'text' },
+                    { id: 'edit_email', name: 'email', label: 'Email', icon: Mail, type: 'email' },
+                    { id: 'edit_district', name: 'district', label: 'District', icon: Building2, type: 'select' },
+                    { id: 'edit_phone', name: 'phone', label: 'Phone', icon: Phone, type: 'text' },
                   ].map(f => (
                     <div key={f.id} className="sa-field">
                       <label className="sa-label" htmlFor={f.id}>{f.label}</label>
                       <div className="sa-input-wrap">
                         <f.icon size={14} className="sa-input-icon" />
-                        <input
-                          id={f.id} name={f.name} type={f.type}
-                          className={`sa-input ${editErrors[f.name] ? 'sa-input-error' : ''}`}
-                          value={editForm[f.name] || ''}
-                          onChange={e => { setEditForm(p => ({ ...p, [f.name]: e.target.value })); setEditErrors(p => ({ ...p, [f.name]: '' })) }}
-                          onBlur={e => setEditErrors(p => ({ ...p, [f.name]: validateValue(f.name, e.target.value) }))}
-                        />
+                        {f.type === 'select' ? (
+                          <select
+                            id={f.id} name={f.name}
+                            className={`sa-input sa-select ${editErrors[f.name] ? 'sa-input-error' : ''}`}
+                            value={editForm[f.name] || ''}
+                            onChange={e => { setEditForm(p => ({ ...p, [f.name]: e.target.value })); setEditErrors(p => ({ ...p, [f.name]: '' })) }}
+                          >
+                            <option value="">Select District</option>
+                            <option value="Coimbatore">Coimbatore</option>
+                            <option value="Erode">Erode</option>
+                            <option value="Salem">Salem</option>
+                            <option value="Tiruppur">Tiruppur</option>
+                            <option value="Trichy">Trichy</option>
+                          </select>
+                        ) : (
+                          <input
+                            id={f.id} name={f.name} type={f.type}
+                            className={`sa-input ${editErrors[f.name] ? 'sa-input-error' : ''}`}
+                            value={editForm[f.name] || ''}
+                            onChange={e => { setEditForm(p => ({ ...p, [f.name]: e.target.value })); setEditErrors(p => ({ ...p, [f.name]: '' })) }}
+                            onBlur={e => setEditErrors(p => ({ ...p, [f.name]: validateValue(f.name, e.target.value) }))}
+                          />
+                        )}
                       </div>
                       {editErrors[f.name] && <p className="sa-field-error">{editErrors[f.name]}</p>}
                     </div>

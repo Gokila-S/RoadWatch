@@ -192,14 +192,20 @@ const Login = () => {
                 </div>
                 <div className="input-group">
                   <label className="input-label">District</label>
-                  <input
-                    type="text"
+                  <select
                     className="input-field"
-                    placeholder="e.g. Coimbatore"
+                    style={{ background: 'var(--bg-tertiary)', color: 'var(--text-primary)', cursor: 'pointer' }}
                     value={district}
                     onChange={(e) => setDistrict(e.target.value)}
                     required
-                  />
+                  >
+                    <option value="">Select District</option>
+                    <option value="Coimbatore">Coimbatore</option>
+                    <option value="Erode">Erode</option>
+                    <option value="Salem">Salem</option>
+                    <option value="Tiruppur">Tiruppur</option>
+                    <option value="Trichy">Trichy</option>
+                  </select>
                 </div>
                 <button type="submit" className="btn btn-primary btn-lg w-full mt-4" disabled={authLoading}>
                   Create Citizen Account

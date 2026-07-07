@@ -69,20 +69,9 @@ export const uploadReportMedia = async (req, res, next) => {
       }
     }
 
-    // Reject images that are not classified as road damage with ≥ 80 % confidence
-    if (!aiResult.store_in_db) {
-      return res.status(422).json({
-        message:
-          aiResult.prediction === 'not_road'
-            ? `Image does not appear to show road damage (confidence: ${(aiResult.confidence * 100).toFixed(1)}%). Please upload a clear photo of the damaged road.`
-            : `AI confidence too low (${(aiResult.confidence * 100).toFixed(1)}%). Please upload a clearer photo of the damaged road.`,
-        code: 'AI_REJECTED',
-        ai: {
-          prediction: aiResult.prediction,
-          confidence: aiResult.confidence,
-        },
-      })
-    }
+    // AI verified status is stored as verified_by_model (whether it met the thresholds)
+    // but the upload is always allowed to support citizen manual overrides
+    const verifiedByModel = Boolean(aiResult.store_in_db)
     // ────────────────────────────────────────────────────────────────────────
 
     await ensureBucket(supabaseAdmin)
@@ -116,7 +105,7 @@ export const uploadReportMedia = async (req, res, next) => {
         ai_confidence,
         verified_by_model
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING id, created_at
       `,
       [
@@ -127,6 +116,7 @@ export const uploadReportMedia = async (req, res, next) => {
         file.originalname || 'upload.jpg',
         aiResult.prediction,
         aiResult.confidence,
+        verifiedByModel,
       ],
     )
 

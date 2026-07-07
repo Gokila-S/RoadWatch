@@ -315,6 +315,7 @@ export const seedCoreData = async () => {
           priority = $4,
           report_categories = $6::text[],
           starts_at = NOW() + ($7 || ' hour')::interval,
+          expires_at = NOW() + ($7 || ' hour')::interval + ($9 || ' hour')::interval,
           is_published = TRUE,
           updated_at = NOW()
         WHERE title = $1
@@ -330,6 +331,7 @@ export const seedCoreData = async () => {
           announcement.report_categories,
           String(announcement.starts_in_hours),
           createdBy,
+          String(announcement.expires_in_hours || 24),
         ],
       )
 
@@ -347,6 +349,7 @@ export const seedCoreData = async () => {
           district,
           report_categories,
           starts_at,
+          expires_at,
           is_published,
           created_by
         )
@@ -358,6 +361,7 @@ export const seedCoreData = async () => {
           $5,
           $6::text[],
           NOW() + ($7 || ' hour')::interval,
+          NOW() + ($7 || ' hour')::interval + ($9 || ' hour')::interval,
           TRUE,
           $8
         `,
@@ -370,6 +374,7 @@ export const seedCoreData = async () => {
           announcement.report_categories,
           String(announcement.starts_in_hours),
           createdBy,
+          String(announcement.expires_in_hours || 24),
         ],
       )
     }

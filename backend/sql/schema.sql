@@ -80,6 +80,7 @@ CREATE TABLE IF NOT EXISTS announcements (
     report_categories <@ ARRAY['pothole', 'crack', 'hazard', 'waterlogging', 'erosion', 'signage', 'other']::text[]
   ),
   starts_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL DEFAULT NOW() + INTERVAL '7 days',
   is_published BOOLEAN NOT NULL DEFAULT TRUE,
   created_by UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -416,6 +416,11 @@ img { max-width: 100%; display: block; }
   color: var(--signal-green);
 }
 
+.badge-rejected {
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--signal-red);
+}
+
 .badge-critical {
   border: 1px solid rgba(239, 68, 68, 0.3);
   color: var(--signal-red);
@@ -433,6 +438,7 @@ img { max-width: 100%; display: block; }
 .badge-verified .badge-dot { background: var(--signal-blue); }
 .badge-assigned .badge-dot { background: var(--signal-purple); }
 .badge-resolved .badge-dot { background: var(--signal-green); }
+.badge-rejected .badge-dot { background: var(--signal-red); }
 .badge-critical .badge-dot { background: var(--signal-red); }
 
 @keyframes pulse-dot {

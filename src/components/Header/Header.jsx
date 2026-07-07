@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sun, Moon } from 'lucide-react'
+import { Sun, Moon, Lock, Eye, EyeOff, X, Key } from 'lucide-react'
 import useStore from '../../store/useStore'
 import logoImg from '../../assets/logo.png'
 import './Header.css'
@@ -9,10 +9,60 @@ import './Header.css'
 const Header = () => {
   const location = useLocation()
   const navigate = useNavigate()
-  const { isAuthenticated, user, userRole, logout, theme, toggleTheme } = useStore()
+  const { isAuthenticated, user, userRole, logout, theme, toggleTheme, changePassword } = useStore()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+
+  // Password change states
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false)
+  const [changePasswordError, setChangePasswordError] = useState('')
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    setChangePasswordError('')
+    setChangePasswordSuccess('')
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setChangePasswordError('All fields are required')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setChangePasswordError('New passwords do not match')
+      return
+    }
+
+    if (newPassword.length < 8) {
+      setChangePasswordError('New password must be at least 8 characters long')
+      return
+    }
+
+    setChangePasswordLoading(true)
+    try {
+      await changePassword(currentPassword, newPassword)
+      setChangePasswordSuccess('Password updated successfully!')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      setTimeout(() => {
+        setShowChangePasswordModal(false)
+        setChangePasswordSuccess('')
+      }, 1500)
+    } catch (err) {
+      setChangePasswordError(err.message || 'Failed to update password')
+    } finally {
+      setChangePasswordLoading(false)
+    }
+  }
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20)
@@ -52,17 +102,20 @@ const Header = () => {
       { path: '/reports', label: 'All Reports' },
       { path: '/analytics', label: 'Analytics' },
     ] : [
+      { path: '/check-road', label: 'Check Road' },
       { path: '/announcements', label: 'Announcements' },
       { path: '/dashboard', label: 'My Reports' },
       { path: '/report', label: 'Report Issue' },
     ]
   ) : [
     { path: '/', label: 'Home' },
+    { path: '/check-road', label: 'Check Road' },
     { path: '/login', label: 'Sign In' },
   ]
 
   return (
-    <header className={`header ${scrolled ? 'header-scrolled' : ''}`}>
+    <>
+      <header className={`header ${scrolled ? 'header-scrolled' : ''}`}>
       <div className="header-inner">
         <Link to="/" className="header-logo">
           <div className="logo-icon" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -193,6 +246,11 @@ const Header = () => {
                       
                       <div className="profile-divider" style={{ margin: '8px 0' }}></div>
                       
+                      <button className="profile-option" onClick={() => { setShowChangePasswordModal(true); setProfileOpen(false); }} style={{ gap: '10px' }}>
+                        <Key size={16} style={{ color: 'var(--amber)', transform: 'rotate(-45deg)' }} />
+                        Change Password
+                      </button>
+
                       <button className="profile-option" onClick={handleLogout}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -228,6 +286,123 @@ const Header = () => {
         </div>
       </div>
     </header>
+      
+      {/* 🔐 CHANGE PASSWORD MODAL */}
+      <AnimatePresence>
+        {showChangePasswordModal && (
+          <>
+            <motion.div 
+              className="sa-modal-backdrop" 
+              style={{ zIndex: 99999 }}
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={() => setShowChangePasswordModal(false)} 
+            />
+            <div className="sa-modal-center-wrap" style={{ zIndex: 100000 }}>
+              <motion.div 
+                className="sa-modal glass-panel" 
+                style={{ maxWidth: '420px', border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}
+                initial={{ opacity: 0, y: 20, scale: 0.95 }} 
+                animate={{ opacity: 1, y: 0, scale: 1 }} 
+                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="sa-modal-header" style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <Lock size={20} className="text-accent" />
+                    <div>
+                      <h3 className="sa-modal-title" style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Change Password</h3>
+                      <p className="sa-modal-sub" style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>Update your security credentials</p>
+                    </div>
+                  </div>
+                  <button className="sa-modal-close" onClick={() => setShowChangePasswordModal(false)} style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer' }}><X size={18} /></button>
+                </div>
+
+                <form onSubmit={handleChangePassword}>
+                  {changePasswordError && (
+                    <div style={{ padding: '8px 12px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: 'var(--signal-red)', fontSize: '0.78rem', marginBottom: '16px' }}>
+                      {changePasswordError}
+                    </div>
+                  )}
+                  {changePasswordSuccess && (
+                    <div style={{ padding: '8px 12px', borderRadius: '6px', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', color: 'var(--signal-green)', fontSize: '0.78rem', marginBottom: '16px' }}>
+                      {changePasswordSuccess}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
+                    <div className="sa-field">
+                      <label className="sa-label" htmlFor="curr_pw" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Current Password</label>
+                      <div className="sa-input-wrap" style={{ position: 'relative' }}>
+                        <Lock size={14} className="sa-input-icon" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
+                        <input 
+                          id="curr_pw"
+                          type={showCurrentPassword ? 'text' : 'password'} 
+                          className="sa-input" 
+                          style={{ width: '100%', paddingLeft: '36px', paddingRight: '36px', height: '40px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                          placeholder="Enter current password"
+                          value={currentPassword}
+                          onChange={e => setCurrentPassword(e.target.value)}
+                        />
+                        <button type="button" className="sa-pw-toggle" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer' }} onClick={() => setShowCurrentPassword(!showCurrentPassword)}>
+                          {showCurrentPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="sa-field">
+                      <label className="sa-label" htmlFor="new_pw" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>New Password</label>
+                      <div className="sa-input-wrap" style={{ position: 'relative' }}>
+                        <Lock size={14} className="sa-input-icon" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
+                        <input 
+                          id="new_pw"
+                          type={showNewPassword ? 'text' : 'password'} 
+                          className="sa-input" 
+                          style={{ width: '100%', paddingLeft: '36px', paddingRight: '36px', height: '40px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                          placeholder="Min 8 characters"
+                          value={newPassword}
+                          onChange={e => setNewPassword(e.target.value)}
+                        />
+                        <button type="button" className="sa-pw-toggle" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer' }} onClick={() => setShowNewPassword(!showNewPassword)}>
+                          {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="sa-field">
+                      <label className="sa-label" htmlFor="confirm_pw" style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>Confirm New Password</label>
+                      <div className="sa-input-wrap" style={{ position: 'relative' }}>
+                        <Lock size={14} className="sa-input-icon" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
+                        <input 
+                          id="confirm_pw"
+                          type={showConfirmPassword ? 'text' : 'password'} 
+                          className="sa-input" 
+                          style={{ width: '100%', paddingLeft: '36px', paddingRight: '36px', height: '40px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                          placeholder="Re-enter new password"
+                          value={confirmPassword}
+                          onChange={e => setConfirmPassword(e.target.value)}
+                        />
+                        <button type="button" className="sa-pw-toggle" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer' }} onClick={() => setShowConfirmPassword(!showConfirmPassword)}>
+                          {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="sa-form-actions sa-modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
+                    <button type="button" className="sa-btn sa-btn-ghost" style={{ padding: '8px 16px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: 'var(--text-secondary)', cursor: 'pointer' }} onClick={() => setShowChangePasswordModal(false)}>Cancel</button>
+                    <button type="submit" className="sa-btn sa-btn-primary" style={{ padding: '8px 16px', background: 'var(--amber)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }} disabled={changePasswordLoading}>
+                      {changePasswordLoading ? 'Updating...' : 'Update Password'}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          </>
+        )}
+      </AnimatePresence>
+    </>
   )
 }
 

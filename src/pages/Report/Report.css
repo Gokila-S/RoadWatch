@@ -567,3 +567,134 @@
 
 /* Display flex utility used in report */
 .display-flex-1 { flex: 1 1 0%; }
+
+/* ── Two-Stage Pipeline Indicator ── */
+.pipeline-stage-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 1rem;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  max-width: 320px;
+}
+
+.pipeline-stage-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.45);
+  transition: all 0.3s ease;
+}
+
+.pipeline-stage-item.active {
+  color: var(--signal-cyan);
+  text-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+}
+
+.pipeline-stage-item.active span {
+  animation: pulse 1.2s infinite;
+}
+
+.pipeline-stage-item.completed {
+  color: var(--signal-green);
+  text-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
+}
+
+/* ── Pipeline Damage Badge ── */
+.pipeline-damage-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(245, 158, 11, 0.2);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(245, 158, 11, 0.6);
+  color: var(--amber);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.25);
+}
+
+/* ── Damage Warning Banner ── */
+.damage-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.06);
+  color: var(--amber);
+}
+
+.damage-warning-banner p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.damage-warning-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ── AI Suggested Badge ── */
+.ai-suggested-badge {
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  font-size: 0.55rem;
+  font-family: var(--font-mono);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
+  animation: ai-badge-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes ai-badge-glow {
+  0% { box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3); }
+  100% { box-shadow: 0 2px 16px rgba(245, 158, 11, 0.6); }
+}
+
+/* ── Coming Soon ── */
+.validation-coming-soon {
+  font-size: 0.68rem !important;
+  font-weight: 600;
+  color: var(--text-tertiary) !important;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 6px;
+  padding: 2px 8px;
+  letter-spacing: 0.06em;
+}
+
+/* ── 3-Column Validation Grid ── */
+.validation-summary-grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 480px) {
+  .validation-summary-grid-3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .validation-summary-grid-3 .validation-metric:last-child {
+    grid-column: 1 / -1;
+  }
+}

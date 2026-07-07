@@ -40,26 +40,43 @@ const attachScanResultIfAny = async (req, res, next) => {
 // Upload route reuses any cached scan result when available to avoid duplicate AI calls.
 mediaRouter.post('/upload', authenticate, upload.single('file'), attachScanResultIfAny, uploadReportMedia)
 
-// Run AI classification on a single image without storing — used for quick client-side scans
+// Run AI two-stage pipeline on a single image without storing — used for quick client-side scans
 mediaRouter.post('/scan', authenticate, upload.single('file'), async (req, res, next) => {
   // Lazy-load controller to avoid circular deps in tests
   try {
-    const { classifyImage } = await import('../utils/aiFilter.js')
+    const { classifyImagePipeline } = await import('../utils/aiFilter.js')
     const file = req.file
     if (!file) return res.status(400).json({ message: 'Image file is required' })
 
-    const aiResult = await classifyImage(file.buffer, file.originalname)
+    const pipelineResult = await classifyImagePipeline(file.buffer, file.originalname)
 
-    // store in cache keyed by file content hash
+    // store in cache keyed by file content hash (use stage1 result for upload compatibility)
     try {
       const hash = crypto.createHash('sha256').update(file.buffer).digest('hex')
-      scanCache.set(hash, { result: aiResult, expires: Date.now() + SCAN_TTL_MS })
+      scanCache.set(hash, {
+        result: {
+          prediction: pipelineResult.prediction,
+          confidence: pipelineResult.confidence,
+          store_in_db: pipelineResult.store_in_db,
+        },
+        expires: Date.now() + SCAN_TTL_MS,
+      })
     } catch (e) {
       // Non-fatal: continue if hashing fails
       console.error('Failed to store scan cache:', e)
     }
 
-    return res.json({ ai: aiResult, scanId: null })
+    return res.json({
+      ai: {
+        prediction: pipelineResult.prediction,
+        confidence: pipelineResult.confidence,
+        store_in_db: pipelineResult.store_in_db,
+      },
+      stage1: pipelineResult.stage1,
+      stage2: pipelineResult.stage2,
+      final_label: pipelineResult.final_label,
+      scanId: null,
+    })
   } catch (err) {
     return next(err)
   }

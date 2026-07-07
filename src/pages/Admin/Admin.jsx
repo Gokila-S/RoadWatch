@@ -337,7 +337,7 @@ const Admin = () => {
                        <button className="decision-btn decision-btn-verify" onClick={() => handleAction('verified')}>
                          <CheckCircle2 size={16} /> Verify Report
                        </button>
-                       <button className="decision-btn decision-btn-reject" onClick={() => handleAction('resolved', 'Rejected - Invalid Report')}>
+                       <button className="decision-btn decision-btn-reject" onClick={() => handleAction('rejected', 'Rejected - Invalid Report')}>
                          <XCircle size={16} /> Reject
                        </button>
                      </div>
@@ -397,6 +397,16 @@ const Admin = () => {
                          <span>Issue Successfully Resolved</span>
                        </div>
                        <p className="resolved-note">Resolution logged in main audit ledger.</p>
+                     </div>
+                   )}
+                   
+                   {selectedReport.status === 'rejected' && (
+                     <div className="resolved-status-card" style={{ borderColor: 'var(--signal-red)' }}>
+                       <div className="resolved-icon-text" style={{ color: 'var(--signal-red)' }}>
+                         <XCircle size={24} />
+                         <span>Issue Rejected</span>
+                       </div>
+                       <p className="resolved-note">This report has been marked as rejected / invalid.</p>
                      </div>
                    )}
                  </div>

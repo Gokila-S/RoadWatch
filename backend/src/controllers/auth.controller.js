@@ -172,3 +172,36 @@ export const me = async (req, res, next) => {
     return next(error)
   }
 }
+
+export const changePassword = async (req, res, next) => {
+  try {
+    const { current_password, new_password } = req.body
+    if (!current_password || !new_password) {
+      return res.status(400).json({ message: 'Current password and new password are required' })
+    }
+
+    const userQuery = await pool.query(
+      `SELECT password_hash FROM auth_users WHERE id = $1`,
+      [req.user.sub]
+    )
+    if (userQuery.rowCount === 0) {
+      return res.status(404).json({ message: 'User not found' })
+    }
+
+    const { password_hash } = userQuery.rows[0]
+    const validPassword = await bcrypt.compare(current_password, password_hash)
+    if (!validPassword) {
+      return res.status(401).json({ message: 'Incorrect current password' })
+    }
+
+    const newHash = await bcrypt.hash(new_password, 12)
+    await pool.query(
+      `UPDATE auth_users SET password_hash = $1 WHERE id = $2`,
+      [newHash, req.user.sub]
+    )
+
+    return res.json({ message: 'Password updated successfully' })
+  } catch (error) {
+    return next(error)
+  }
+}

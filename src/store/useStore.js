@@ -374,6 +374,25 @@ const useStore = create((set, get) => ({
     return data
   },
 
+  changePassword: async (currentPassword, newPassword) => {
+    const token = get().token
+    const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    })
+
+    const data = await response.json()
+    if (!response.ok) {
+      throw new Error(data.message || 'Could not change password')
+    }
+
+    return data
+  },
+
   fetchCurrentUser: async () => {
     const token = get().token
     if (!token) return null

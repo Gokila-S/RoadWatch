@@ -34,7 +34,6 @@ const mapAnnouncementRow = (row) => ({
   category: row.category,
   priority: row.priority,
   district: row.district,
-  ward: row.ward,
   startsAt: row.starts_at,
   expiresAt: row.expires_at,
 })
@@ -228,9 +227,6 @@ export const createReport = async (req, res, next) => {
     const invalidMedia = mediaResult.rows.find((media) => (
       media.uploaded_by !== req.user.sub
       || media.report_id
-      || !media.verified_by_model
-      || media.ai_prediction !== 'road_damage'
-      || Number(media.ai_confidence) < 0.8
     ))
 
     if (invalidMedia) {
@@ -345,7 +341,7 @@ export const createReport = async (req, res, next) => {
 
     const relatedAnnouncementsResult = await pool.query(
       `
-      SELECT id, title, message, category, priority, district, ward, starts_at, expires_at
+      SELECT id, title, message, category, priority, district, starts_at, expires_at
       FROM announcements
       WHERE is_published = TRUE
         AND starts_at <= NOW()

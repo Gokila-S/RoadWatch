@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Camera, MapPin, CheckCircle2, ChevronRight, AlertTriangle, CloudRain, Construction, MapPinOff, ScanSearch, BellRing, RotateCcw } from 'lucide-react'
+import { Camera, MapPin, CheckCircle2, ChevronRight, AlertTriangle, CloudRain, Construction, MapPinOff, ScanSearch, BellRing, RotateCcw, ShieldCheck, Zap, Info } from 'lucide-react'
 import useStore from '../../store/useStore'
 import MapView from '../../components/MapView/MapView'
 import './Report.css'
@@ -29,7 +29,13 @@ const Report = () => {
   const [cameraReady, setCameraReady] = useState(false)
   const [relatedAnnouncements, setRelatedAnnouncements] = useState([])
   const [similarReports, setSimilarReports] = useState([])
+  const [stage1Data, setStage1Data] = useState(null)
+  const [stage2Data, setStage2Data] = useState(null)
+  const [damageWarning, setDamageWarning] = useState('')
+  const [pipelineStage, setPipelineStage] = useState(null) // null | 'stage1' | 'stage2' | 'done'
   const [checkingRelatedAnnouncements, setCheckingRelatedAnnouncements] = useState(false)
+  const [isOverridden, setIsOverridden] = useState(false)
+  const [aiPopup, setAiPopup] = useState(null)
   const cameraInputRef = useRef(null)
   const galleryInputRef = useRef(null)
   const videoRef = useRef(null)
@@ -49,7 +55,7 @@ const Report = () => {
   })
 
   const locationReady = Number.isFinite(location.lat) && Number.isFinite(location.lng) && Boolean(location.address)
-  const roadValidationPassed = Number.isFinite(roadImageScore) && roadImageScore >= 45
+  const roadValidationPassed = (Number.isFinite(roadImageScore) && roadImageScore >= 45) || isOverridden
   const shouldDisableDeploy = isSupportingIssue || similarReports.length > 0
 
   const analyzeRoadLikelihood = async (file) => {
@@ -60,6 +66,7 @@ const Report = () => {
     const url = `${API_BASE.replace(/\/$/, '')}/api/media/scan`
 
     try {
+      setPipelineStage('stage1')
       const response = await fetch(url, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -67,19 +74,40 @@ const Report = () => {
       })
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        return { score: 0, rejected: true, raw: null, isError: true, errorMessage: errorData.message || `Server Error ${response.status}` }
+        setPipelineStage(null)
+        return { score: 0, rejected: true, raw: null, isError: true, errorMessage: errorData.message || `Server Error ${response.status}`, stage1: null, stage2: null, finalLabel: null }
       }
       const payload = await response.json()
       const data = payload.ai || payload
+      const s1 = payload.stage1 || null
+      const s2 = payload.stage2 || null
+      const finalLabel = payload.final_label || data.prediction
+
+      // Simulate stage progression for UX
+      if (s1) {
+        setStage1Data(s1)
+        if (s1.passed && s2) {
+          setPipelineStage('stage2')
+          // Brief delay to show stage 2 animation
+          await new Promise(r => setTimeout(r, 800))
+          setStage2Data(s2)
+        }
+      }
+      setPipelineStage('done')
+
       return {
         score: Math.round((data.confidence || 0) * 100),
         rejected: !data.store_in_db,
         raw: data,
         isError: false,
+        stage1: s1,
+        stage2: s2,
+        finalLabel,
       }
     } catch (err) {
       console.error('AI Service Error:', err)
-      return { score: 0, rejected: true, raw: null, isError: true, errorMessage: err.message }
+      setPipelineStage(null)
+      return { score: 0, rejected: true, raw: null, isError: true, errorMessage: err.message, stage1: null, stage2: null, finalLabel: null }
     }
   }
 
@@ -199,7 +227,12 @@ const Report = () => {
 
   const processSelectedImage = async (file) => {
     setSubmitError('')
+    setDamageWarning('')
     setRoadScanChecking(true)
+    setStage1Data(null)
+    setStage2Data(null)
+    setPipelineStage(null)
+    setIsOverridden(false)
 
     try {
       const aiResult = await analyzeRoadLikelihood(file)
@@ -208,11 +241,18 @@ const Report = () => {
         setRoadScanChecking(false);
         return false;
       }
-      if (aiResult.rejected) {
-        setRoadImageScore(aiResult.score)
-        setAiData(null)
-        setFormData((prev) => ({ ...prev, category: '', severity: '' }))
-        setSubmitError(`AI Rejected: Image does not appear to show road damage (Confidence: ${aiResult.score}%). Please upload a valid image.`)
+
+      const isRejected = aiResult.rejected
+      const isNormalRoad = aiResult.stage2?.label === 'normal'
+
+      if (isRejected || isNormalRoad) {
+        setAiPopup({
+          type: isNormalRoad ? 'undamaged' : 'not_road',
+          score: aiResult.score,
+          file,
+          aiResult
+        })
+        setRoadScanChecking(false)
         return false
       }
 
@@ -224,12 +264,32 @@ const Report = () => {
       setRoadImageScore(aiResult.score)
       setImage(previewUrl)
       setImageFile(file)
+
+      // Handle Stage 2 (CLIP damage classification) results
+      const s2 = aiResult.stage2
+      let autoCategory = ''
+      let aiSummary = 'Road verified by AI model.'
+
+      if (s2) {
+        if (s2.label === 'pothole') {
+          autoCategory = 'pothole'
+          aiSummary = `AI detected Pothole with ${Math.round(s2.confidence * 100)}% confidence.`
+        }
+      }
+
       setAiData({
-        category: aiResult.raw.prediction,
+        category: autoCategory || 'pothole',
         confidence: aiResult.score,
-        rejected: false,
-        summary: 'Road damage confidently verified by AI model.',
+        rejected: isRejected,
+        summary: aiSummary,
+        stage2Label: s2?.label || null,
+        stage2Confidence: s2 ? Math.round(s2.confidence * 100) : null,
       })
+
+      if (autoCategory) {
+        setFormData(prev => ({ ...prev, category: autoCategory }))
+      }
+
       setStep(2)
       return true
     } catch {
@@ -238,6 +298,49 @@ const Report = () => {
     } finally {
       setRoadScanChecking(false)
     }
+  }
+
+  const handleUploadAnyway = () => {
+    if (!aiPopup) return
+    const { file, aiResult } = aiPopup
+    setAiPopup(null)
+    setIsOverridden(true)
+
+    if (image) {
+      URL.revokeObjectURL(image)
+    }
+
+    const previewUrl = URL.createObjectURL(file)
+    setRoadImageScore(aiResult.score)
+    setImage(previewUrl)
+    setImageFile(file)
+
+    const s2 = aiResult.stage2
+    const isNormalRoad = s2?.label === 'normal'
+
+    setAiData({
+      category: 'pothole',
+      confidence: aiResult.score,
+      rejected: aiResult.rejected,
+      summary: aiResult.rejected 
+        ? `AI verification failed (${aiResult.score}%). Proceeding via citizen override.` 
+        : isNormalRoad
+          ? 'AI flagged as normal road. Proceeding via citizen override.'
+          : 'Road verified, proceeding via citizen override.',
+      stage2Label: s2?.label || null,
+      stage2Confidence: s2 ? Math.round(s2.confidence * 100) : null,
+    })
+
+    setFormData(prev => ({ ...prev, category: 'pothole' }))
+    setStep(2)
+  }
+
+  const handleRetakeCancel = () => {
+    setAiPopup(null)
+    setRoadImageScore(null)
+    setAiData(null)
+    setFormData((prev) => ({ ...prev, category: '', severity: '' }))
+    setIsOverridden(false)
   }
 
   const handleImageUpload = (e) => {
@@ -329,23 +432,8 @@ const Report = () => {
   }
 
   useEffect(() => {
-    if (step !== 2 || !imageFile || !formData.category) {
-      setAnalyzing(false)
-      return
-    }
-
-    if (!AI_SCAN_SUPPORTED_CATEGORIES.includes(formData.category)) {
-      setAnalyzing(false)
-      return
-    }
-
-    setAnalyzing(true)
-
-    const timer = setTimeout(() => {
-      setAnalyzing(false)
-    }, 600)
-
-    return () => clearTimeout(timer)
+    // No longer running per-category analysis — pipeline does it all at once
+    setAnalyzing(false)
   }, [step, imageFile, formData.category])
 
   useEffect(() => {
@@ -498,7 +586,20 @@ const Report = () => {
                   </p>
                   {cameraError ? <p className="camera-warning">{cameraError}</p> : null}
                   {submitError ? <p className="text-sm mt-4 text-center font-semibold" style={{ color: 'var(--signal-red)', textShadow: '0 2px 4px rgba(0,0,0,0.2)' }}>{submitError}</p> : null}
-                  {roadScanChecking ? <p className="text-sm mt-4 text-center font-semibold text-signal-cyan" style={{ textShadow: '0 2px 4px rgba(0,0,0,0.8)' }}>Analyzing image via AI...</p> : null}
+                  {roadScanChecking && (
+                    <div className="pipeline-stage-indicator">
+                      <div className={`pipeline-stage-item ${pipelineStage === 'stage1' ? 'active' : pipelineStage === 'stage2' || pipelineStage === 'done' ? 'completed' : ''}`}>
+                        <ShieldCheck size={16} />
+                        <span>{pipelineStage === 'stage1' ? 'Verifying road image...' : 'Road verified'}</span>
+                      </div>
+                      {(pipelineStage === 'stage2' || pipelineStage === 'done') && (
+                        <div className={`pipeline-stage-item ${pipelineStage === 'stage2' ? 'active' : pipelineStage === 'done' ? 'completed' : ''}`}>
+                          <Zap size={16} />
+                          <span>{pipelineStage === 'stage2' ? 'Analyzing damage type...' : 'Damage analysis complete'}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="camera-actions mt-4">
                     <button type="button" className="capture-option-btn" onClick={handleCameraClick}>
@@ -571,15 +672,24 @@ const Report = () => {
                           </div>
                         </motion.div>
                      )}
+
+                     {/* Stage 2 damage badge */}
+                     {aiData?.stage2Label && aiData.stage2Label === 'pothole' && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} style={{ position: 'absolute', bottom: '16px', left: '16px', zIndex: 20 }}>
+                          <div className="pipeline-damage-badge">
+                            <Zap size={13} /> POTHOLE DETECTED — {aiData.stage2Confidence}%
+                          </div>
+                        </motion.div>
+                     )}
                    </div>
                  </div>
 
                  <div className="card bg-tertiary border border-dim p-4 validation-summary-card">
                    <div className="validation-summary-head">
                      <span className="text-xs font-mono text-dim tracking-wide">VALIDATION SUMMARY</span>
-                     {roadScanChecking ? <span className="validation-chip validation-chip-pending">Checking road image...</span> : null}
-                     {!roadScanChecking && roadValidationPassed ? <span className="validation-chip validation-chip-pass">Road Verified</span> : null}
-                     {!roadScanChecking && roadImageScore !== null && !roadValidationPassed ? <span className="validation-chip validation-chip-fail">Road Rejected</span> : null}
+                     {roadScanChecking ? <span className="validation-chip validation-chip-pending">AI Pipeline Running...</span> : null}
+                     {!roadScanChecking && (roadValidationPassed || isOverridden) ? <span className="validation-chip validation-chip-pass">Road Verified</span> : null}
+                     {!roadScanChecking && !isOverridden && roadImageScore !== null && !roadValidationPassed ? <span className="validation-chip validation-chip-fail">Road Rejected</span> : null}
                    </div>
 
                    <div className="validation-summary-grid">
@@ -588,25 +698,25 @@ const Report = () => {
                        <span className="validation-value">{roadImageScore ?? '--'}%</span>
                      </div>
                      <div className="validation-metric">
-                       <span className="validation-label">Category Scan</span>
+                       <span className="validation-label">Damage Type</span>
                        <span className="validation-value">
-                         {analyzing
-                           ? 'Running'
-                           : aiData
-                             ? `${aiData.confidence}%`
-                             : '--'}
+                         {stage2Data
+                           ? stage2Data.label === 'pothole' ? '🕳️ Pothole'
+                             : stage2Data.label === 'normal' ? '✅ Normal'
+                             : stage2Data.label
+                           : '--'}
                        </span>
                      </div>
                    </div>
 
                    {aiData ? (
-                     <p className={`validation-summary-note ${aiData.rejected ? 'validation-summary-note-fail' : ''}`}>
-                       {aiData.rejected
+                     <p className={`validation-summary-note ${aiData.rejected && !isOverridden ? 'validation-summary-note-fail' : ''}`}>
+                       {aiData.rejected && !isOverridden
                          ? `Rejected: ${aiData.summary}`
-                         : `Detected ${aiData.category.toUpperCase()} with ${aiData.confidence}% confidence.`}
+                         : aiData.summary}
                      </p>
                    ) : (
-                     <p className="validation-summary-note">Select category after road verification to run confidence scan.</p>
+                     <p className="validation-summary-note">Capture a photo to run two-stage AI analysis.</p>
                    )}
                  </div>
 
@@ -671,14 +781,16 @@ const Report = () => {
                        { id: 'crack', icon: <Construction size={20}/>, label: 'Road Crack' },
                        { id: 'waterlogging', icon: <CloudRain size={20}/>, label: 'Waterlogging' },
                        { id: 'hazard', icon: <MapPinOff size={20}/>, label: 'Hazard' }
-                     ].map(cat => (
+                     ].map(cat => {
+                       const isAiSuggested = aiData?.stage2Label === 'pothole' && cat.id === 'pothole' && formData.category === 'pothole'
+                       return (
                         <button 
                           key={cat.id}
                           type="button"
                           onClick={() => handleCategorySelect(cat.id)}
                           disabled={!roadValidationPassed || roadScanChecking}
                           className={`
-                            flex flex-col items-center justify-center gap-3 p-4 rounded-xl border transition-all
+                            flex flex-col items-center justify-center gap-3 p-4 rounded-xl border transition-all relative
                             ${formData.category === cat.id 
                               ? 'border-amber bg-amber/10 text-accent' 
                               : 'border-subtle bg-primary text-secondary'}
@@ -686,10 +798,12 @@ const Report = () => {
                           `}
                           style={formData.category === cat.id ? { boxShadow: '0 0 15px rgba(245,158,11,0.15)', outline: '1px solid rgba(245,158,11,0.5)' } : {}}
                         >
+                          {isAiSuggested && <span className="ai-suggested-badge">AI SUGGESTED</span>}
                           {cat.icon}
                           <span className="font-semibold text-sm">{cat.label}</span>
                         </button>
-                     ))}
+                      )
+                     })}
                    </div>
 
                    <div className="mb-6">
@@ -821,6 +935,70 @@ const Report = () => {
                </button>
              </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+      {/* 🤖 AI VALIDATION WARNING MODAL */}
+      <AnimatePresence>
+        {aiPopup && (
+          <>
+            <motion.div 
+              className="sa-modal-backdrop" 
+              style={{ zIndex: 99999 }}
+              initial={{ opacity: 0 }} 
+              animate={{ opacity: 1 }} 
+              exit={{ opacity: 0 }} 
+              onClick={handleRetakeCancel} 
+            />
+            <div className="sa-modal-center-wrap" style={{ zIndex: 100000 }}>
+              <motion.div 
+                className="sa-modal glass-panel" 
+                style={{ maxWidth: '440px', border: '1px solid var(--border-subtle)', background: 'var(--bg-surface)' }}
+                initial={{ opacity: 0, y: 20, scale: 0.95 }} 
+                animate={{ opacity: 1, y: 0, scale: 1 }} 
+                exit={{ opacity: 0, y: 20, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="sa-modal-header" style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '12px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {aiPopup.type === 'not_road' ? (
+                      <MapPinOff size={22} className="text-signal-red" style={{ color: 'var(--signal-red)' }} />
+                    ) : (
+                      <AlertTriangle size={22} className="text-amber" style={{ color: 'var(--amber)' }} />
+                    )}
+                    <div>
+                      <h3 className="sa-modal-title" style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700 }}>
+                        {aiPopup.type === 'not_road' ? 'Invalid Image Detected' : 'Not a Damaged Road'}
+                      </h3>
+                      <p className="sa-modal-sub" style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                        AI TELEMETRY AUDIT // SCORE: {aiPopup.score}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: '24px' }}>
+                  <p style={{ fontSize: '0.88rem', lineHeight: '1.6', color: 'var(--text-secondary)', margin: 0 }}>
+                    {aiPopup.type === 'not_road' ? (
+                      'The AI model could not verify that this image displays a road. Please upload a clear photo of a road.'
+                    ) : (
+                      'AI analysis suggests this road is in good condition (no damage detected). Only damaged roads can be reported.'
+                    )}
+                  </p>
+                </div>
+
+                <div className="sa-form-actions sa-modal-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', paddingTop: '16px', borderTop: '1px solid var(--border-subtle)' }}>
+                  <button 
+                    type="button" 
+                    className="sa-btn sa-btn-ghost" 
+                    style={{ padding: '10px 20px', background: 'var(--bg-primary)', border: '1px solid var(--border-subtle)', borderRadius: '6px', color: 'var(--text-secondary)', cursor: 'pointer', fontWeight: 600 }} 
+                    onClick={handleRetakeCancel}
+                  >
+                    Close & Try Again
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </>
         )}
       </AnimatePresence>
     </div>

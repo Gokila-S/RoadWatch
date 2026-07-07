@@ -18,6 +18,7 @@ const mapAnnouncementRow = (row) => ({
   },
   reportCategories: row.report_categories || [],
   startsAt: row.starts_at,
+  expiresAt: row.expires_at,
   isPublished: row.is_published,
   createdBy: row.created_by,
   createdByName: row.created_by_name,
@@ -216,10 +217,11 @@ export const createAnnouncement = async (req, res, next) => {
         location_lng,
         report_categories,
         starts_at,
+        expires_at,
         is_published,
         created_by
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, TRUE, $10)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, $9::timestamptz + INTERVAL '7 days', TRUE, $10)
       RETURNING *
       `,
       [
