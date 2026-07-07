@@ -261,9 +261,6 @@ def classify():
     CLIP-based 3-class road condition classifier.
     Returns: { label, confidence, scores, description }
     """
-    if DISABLE_CLIP:
-        return jsonify({"error": "CLIP classifier is disabled on this server."}), 400
-
     if "image" not in request.files:
         return jsonify({"error": "No image file provided. Use field name 'image'."}), 400
 
@@ -274,27 +271,74 @@ def classify():
     if not allowed_file(file.filename):
         return jsonify({"error": f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"}), 415
 
-    try:
-        from clip_classifier import classify_road
+    if DISABLE_CLIP:
+        # Fallback to Stage 1 ONNX model when CLIP is disabled
+        current_session = get_model()
+        if current_session is None:
+            return jsonify({"error": "Road detection model is not loaded."}), 503
 
-        image_bytes = file.read()
-        result = classify_road(image_bytes)
+        # Save temp file to run ONNX preprocessing
+        unique_name = f"{uuid.uuid4().hex}_{file.filename}"
+        temp_path = os.path.join(UPLOAD_FOLDER, unique_name)
+        file_bytes = file.read()
+        with open(temp_path, "wb") as f:
+            f.write(file_bytes)
 
-        descriptions = {
-            "pothole": "Road damage detected \u2014 this road has potholes, cracks, or surface damage.",
-            "normal": "This road appears to be in good condition. No damage detected.",
-            "not_road": "This image does not appear to be a road.",
-        }
+        try:
+            img_array = preprocess_image(temp_path)
+            outputs = current_session.run(None, {model_input_name: img_array})
+            raw = float(outputs[0][0][0])
+            label_s1, confidence_s1, store_s1 = interpret_prediction(raw)
 
-        return jsonify({
-            "label":       result["label"],
-            "confidence":  result["confidence"],
-            "scores":      result["scores"],
-            "description": descriptions.get(result["label"], ""),
-        })
-    except Exception as exc:
-        logger.exception("Classification error: %s", exc)
-        return jsonify({"error": f"Classification failed: {str(exc)}"}), 500
+            # Map road_damage -> pothole, not_road -> normal
+            mapped_label = "pothole" if label_s1 == "road_damage" else "normal"
+            confidence = confidence_s1
+
+            scores = {
+                "pothole": confidence if mapped_label == "pothole" else 1.0 - confidence,
+                "normal": confidence if mapped_label == "normal" else 1.0 - confidence,
+                "not_road": 0.0,
+            }
+
+            descriptions = {
+                "pothole": "Road damage detected (ONNX fallback) — this road has potholes, cracks, or surface damage.",
+                "normal": "This road appears to be in good condition. No damage detected (ONNX fallback).",
+            }
+
+            return jsonify({
+                "label":       mapped_label,
+                "confidence":  round(confidence, 4),
+                "scores":      scores,
+                "description": descriptions.get(mapped_label, ""),
+            })
+        except Exception as exc:
+            logger.exception("Classification error (ONNX fallback): %s", exc)
+            return jsonify({"error": f"Classification failed: {str(exc)}"}), 500
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+    else:
+        try:
+            from clip_classifier import classify_road
+
+            image_bytes = file.read()
+            result = classify_road(image_bytes)
+
+            descriptions = {
+                "pothole": "Road damage detected — this road has potholes, cracks, or surface damage.",
+                "normal": "This road appears to be in good condition. No damage detected.",
+                "not_road": "This image does not appear to be a road.",
+            }
+
+            return jsonify({
+                "label":       result["label"],
+                "confidence":  result["confidence"],
+                "scores":      result["scores"],
+                "description": descriptions.get(result["label"], ""),
+            })
+        except Exception as exc:
+            logger.exception("Classification error: %s", exc)
+            return jsonify({"error": f"Classification failed: {str(exc)}"}), 500
 
 
 @app.route("/pipeline", methods=["POST", "OPTIONS"])
