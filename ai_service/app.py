@@ -491,16 +491,17 @@ def health():
 
 # ── Entry Point ───────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    if not DISABLE_CLIP:
+    from clip_classifier import USE_HF_API
+    if not DISABLE_CLIP and not USE_HF_API:
         # Pre-load the CLIP model at startup so the first /pipeline call doesn't timeout
-        logger.info("Pre-loading CLIP model at startup...")
+        logger.info("Pre-loading local CLIP model at startup...")
         try:
             from clip_classifier import get_classifier
             get_classifier()
-            logger.info("✅ CLIP model pre-loaded successfully")
+            logger.info("✅ local CLIP model pre-loaded successfully")
         except Exception as e:
-            logger.warning("⚠️ Could not pre-load CLIP model: %s (will retry on first request)", e)
+            logger.warning("⚠️ Could not pre-load local CLIP model: %s (will retry on first request)", e)
     else:
-        logger.info("CLIP model pre-loading skipped (DISABLE_CLIP is set to True)")
+        logger.info("CLIP model pre-loading skipped (DISABLE_CLIP or USE_HF_API is set to True)")
 
     app.run(debug=True, host="0.0.0.0", port=5000)
